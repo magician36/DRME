@@ -42,9 +42,6 @@
     <ClCompile Include="src\AssemblyDialog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="x64\Debug\moc_AssemblyDialog.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\OCCBrepDataProcess.h">

@@ -192,7 +192,6 @@
     <ClCompile Include="src\moc_OCCTWidget.cpp" />
     <ClCompile Include="src\OCCBrepDataProcess.cpp" />
     <ClCompile Include="src\OCCTWidget.cpp" />
-    <ClCompile Include="x64\Debug\moc_AssemblyDialog.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="inc\PartLibraryDock.h" />
