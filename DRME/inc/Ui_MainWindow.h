@@ -1,0 +1,6 @@
+class Ui_MainWindow {
+    // ...existing code...
+    void ApplyColorToShape(QTreeWidgetItem* item, const QColor& color);
+    void ApplyAlphaToShape(QTreeWidgetItem* item, int alpha);
+    // ...existing code...
+};

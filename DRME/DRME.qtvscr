@@ -1,0 +1,492 @@
+<FlowDocument xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" FontFamily="Segoe UI" FontSize="12">
+  <FlowDocument.Tag><![CDATA[{
+  "timestamp": "2025-10-31 12:47:16",
+  "files": {
+    "C:\\Users\\Administrator\\Desktop\\DRME(1)\\DRME\\DRME\\DRME\\DRME.vcxproj": {
+      "before": "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",
+      "after": "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"
+    }
+  }
+}]]></FlowDocument.Tag>
+  <Section Margin="0,24" TextAlignment="Center">
+    <Paragraph FontSize="24" FontWeight="Bold" Margin="12,0">
+      <LineBreak />
+      <Span Foreground="Gray">Qt Visual Studio Tools</Span>
+    </Paragraph>
+    <Paragraph FontSize="42" Margin="12,0" FontWeight="Bold">
+      <Span TextDecorations="Underline">Project Format Conversion</Span>
+    </Paragraph>
+    <Paragraph Margin="12,8" FontSize="18">
+      <Span>Report generated on 2025-10-31 12:47:16</Span>
+    </Paragraph>
+  </Section>
+  <Section>
+    <Paragraph FontSize="32" FontWeight="Bold" Margin="12,0">
+      <Span>Files</Span>
+    </Paragraph>
+    <Paragraph Margin="24,12,0,0">
+      <Span FontFamily="Consolas" FontSize="14" Background="WhiteSmoke"><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+      <LineBreak />
+      <Hyperlink NavigateUri="file://C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj?before">[Before]</Hyperlink>
+      <Hyperlink NavigateUri="file://C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj?after">[After]</Hyperlink>
+      <Hyperlink NavigateUri="file://C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj?diff&amp;before&amp;after">
+                        [Diff before/after]
+                    </Hyperlink>
+      <Hyperlink NavigateUri="file://C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj?diff&amp;before&amp;current">
+                        [Diff before/current]
+                    </Hyperlink>
+      <Hyperlink NavigateUri="file://C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj?diff&amp;after&amp;current">
+                        [Diff after/current]
+                    </Hyperlink>
+      <LineBreak />
+    </Paragraph>
+  </Section>
+  <Section>
+    <Paragraph FontSize="32" FontWeight="Bold" Margin="12,0">
+      <Span>Changes</Span>
+    </Paragraph>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Converting custom build steps to Qt/MSBuild items]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightCoral"><![CDATA[<AdditionalIncludeDirectories>D:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;D:\Library\OSG\include;D:\C\DRME\DRME\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightGreen"><![CDATA[<AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;D:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;D:\Library\OSG\include;D:\C\DRME\DRME\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightCoral"><![CDATA[<AdditionalIncludeDirectories>C:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;C:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Mesh\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Modeling\inc;C:\Users\Administrator\Desktop\Gmsh\Gmsh\include;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtCore;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtGui;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtWidgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightGreen"><![CDATA[<AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;C:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;C:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Mesh\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Modeling\inc;C:\Users\Administrator\Desktop\Gmsh\Gmsh\include;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtCore;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtGui;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtWidgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightCoral"><![CDATA[<AdditionalIncludeDirectories>C:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;C:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Mesh\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Modeling\inc;C:\Users\Administrator\Desktop\Gmsh\Gmsh\include;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtCore;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtGui;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtWidgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span><![CDATA[      ]]></Span><Span Background="LightGreen"><![CDATA[<AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;C:\Qt\Qt5]]></Span><Span><![CDATA[.14.2\5.14.2\msvc2015_64\include;C:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Mesh\inc;C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\Modeling\inc;C:\Users\Administrator\Desktop\Gmsh\Gmsh\include;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtCore;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtGui;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtWidgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Enabling multi-processor compilation]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[      <MultiProcessorCompilation>true</MultiProcessorCompilation>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[      <MultiProcessorCompilation>true</MultiProcessorCompilation>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[      <MultiProcessorCompilation>true</MultiProcessorCompilation>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[      <MultiProcessorCompilation>true</MultiProcessorCompilation>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Project format version]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Keyword>QtVS_v304</Keyword>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Fallback for QTMSBUILD environment variable]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Default Qt properties]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <Import Project="$(QtMsBuild)\qt_defaults.props" Condition="Exists('$(QtMsBuild)\qt_defaults.props')" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Qt build settings]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Warn if Qt/MSBuild is not found]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') OR !Exists('$(QtMsBuild)\Qt.props')">]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Message Importance="High" Text="QtMsBuild: could not locate qt.targets, qt.props; project may not build correctly." />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  </Target>]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Qt property sheet]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Import Project="$(QtMsBuild)\Qt.props" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Import Project="$(QtMsBuild)\Qt.props" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Import Project="$(QtMsBuild)\Qt.props" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[    <Import Project="$(QtMsBuild)\Qt.props" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+    <Paragraph FontSize="20" FontWeight="Bold" Margin="12">
+      <Span><![CDATA[🡺 Qt targets]]></Span>
+    </Paragraph>
+    <Table CellSpacing="0" BorderBrush="Gray" BorderThickness="0.5">
+      <Table.Columns>
+        <TableColumn />
+        <TableColumn />
+      </Table.Columns>
+      <TableRowGroup>
+        <TableRow Background="Orange">
+          <TableCell ColumnSpan="2" BorderThickness="0.5" BorderBrush="Gray">
+            <Paragraph Margin="10,5" FontWeight="Bold">
+              <Span><![CDATA[C:\Users\Administrator\Desktop\DRME(1)\DRME\DRME\DRME\DRME.vcxproj]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell ColumnSpan="2" Background="WhiteSmoke" BorderBrush="Gray" BorderThickness="0.5" />
+        </TableRow>
+        <TableRow>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0" />
+          </TableCell>
+          <TableCell BorderThickness="0, 0, 0.5, 0" BorderBrush="Gray">
+            <Paragraph FontFamily="Consolas" Margin="4, 0">
+              <Span Background="LightGreen"><![CDATA[  <Import Project="$(QtMsBuild)\qt.targets" Condition="Exists('$(QtMsBuild)\qt.targets')" />]]></Span>
+            </Paragraph>
+          </TableCell>
+        </TableRow>
+      </TableRowGroup>
+    </Table>
+  </Section>
+  <Section>
+    <Paragraph />
+  </Section>
+</FlowDocument>
+<!--oHyh9jZOMP7cSp4sAB/sU4yEA6nkrU7z1jO5yIleQ40=-->
