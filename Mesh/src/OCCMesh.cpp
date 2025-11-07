@@ -23,5 +23,5 @@ void  Shape2Mesh3d(TopoDS_Shape aPartShape)
 	model::mesh::generate(3);
 	//model::mesh::recombine();
 	gmsh::write("E:\\Gmsh.stl");
-
+	//测试测试测试
 }
