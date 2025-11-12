@@ -8,6 +8,23 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <QDebug>
+#include <cctype> // 唯一命名辅助
+
+// === 唯一命名辅助（保持其余代码与注释不变）===
+namespace {
+    static std::string stripTrailingDigits(std::string s) {
+        while (!s.empty() && std::isdigit(static_cast<unsigned char>(s.back()))) s.pop_back();
+        return s;
+    }
+    static std::string makeUniqueName(const std::map<std::string, PartInfo>& parts, const std::string& desired) {
+        if (!parts.count(desired)) return desired; // 不冲突直接用
+        std::string base = stripTrailingDigits(desired);
+        if (base.empty()) base = desired;
+        int k = 1; std::string cand;
+        do { cand = base + std::to_string(k++); } while (parts.count(cand));
+        return cand; // 返回 base1, base2, ...
+    }
+}
 
 
 
@@ -114,15 +131,21 @@ void PartGraph::AddPart(const std::string& name, PartType type, const Handle(AIS
     }
 
     // === 登记到 PartGraph ===
-    parts[name] = info;
+    std::string key = makeUniqueName(parts, name); // 保证唯一名
+    if (key != name) {
+        qDebug().noquote() << QString("[PartGraph::AddPart] 名称冲突，重命名 %1 -> %2")
+            .arg(QString::fromStdString(name))
+            .arg(QString::fromStdString(key));
+    }
+    parts[key] = std::move(info);
 
     qDebug().noquote()
         << QString("[PartGraph] ✅ 已添加零件:%1 | 类型:%2 | 孔数:%3 | 主半径:%4")
-        .arg(QString::fromStdString(name))
+        .arg(QString::fromStdString(key))
         .arg((type == PartType::Rod) ? "Rod"
             : (type == PartType::Slider) ? "Slider"
             : (type == PartType::Screw) ? "Screw" : "Bone")
-        .arg(info.holes.size())
+        .arg(parts[key].holes.size())
         .arg(mainRadius, 0, 'f', 3);
 }
 

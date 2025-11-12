@@ -8,6 +8,37 @@
 #include <QDebug>
 #include <QMessageBox>
 #include <TopoDS.hxx>
+#include <QHash> // ★ 新增: 显示名编号缓存
+#include <QString> // ★ 新增: 明确包含 QString 以避免构造访问问题
+
+// ================= 匿名命名空间：稳定显示编号缓存 =================
+namespace {
+    QHash<QString,int> g_idxRod, g_idxSlider, g_idxScrew; // per-type 索引表：真实名 -> 序号
+    int g_nextRod = 1, g_nextSlider = 1, g_nextScrew = 1;
+
+    static QString humanBase(PartType t) {
+        switch (t) {
+        case PartType::Rod:    return QStringLiteral("棒");
+        case PartType::Slider: return QStringLiteral("滑块");
+        case PartType::Screw:  return QStringLiteral("螺钉");
+        default:               return QStringLiteral("零件");
+        }
+    }
+
+    // 按 “类型+真实名” 分配稳定序号；首次遇到就领一个新号
+    static int ensureDisplayIndex(const QString& realName, PartType t) {
+        QHash<QString,int>* mp = (t == PartType::Rod) ? &g_idxRod : (t == PartType::Slider) ? &g_idxSlider : &g_idxScrew;
+        int* nextp = (t == PartType::Rod) ? &g_nextRod : (t == PartType::Slider) ? &g_nextSlider : &g_nextScrew;
+        if (!mp->contains(realName)) (*mp)[realName] = (*nextp)++;
+        return mp->value(realName);
+    }
+
+    // 生成用于显示的标签，例如 “棒1”“滑块2”
+    static QString displayLabel(const QString& realName, PartType t) {
+        int idx = ensureDisplayIndex(realName, t);
+        return humanBase(t) + QString::number(idx);
+    }
+}
 
 AssemblyDialog::AssemblyDialog(
     PartGraph* graph,
@@ -87,14 +118,36 @@ void AssemblyDialog::populatePartATable()
     int row = 0;
     for (const auto& [name, info] : parts)
     {
-        // 跳过已装配的零件
-        if (!info.constraint.targetPart.empty()) continue;
+        // 只在“棒孔已用尽”时隐藏滑块
+        int totalRodHoles = 0, usedRodHoles = 0;
+
+        // 统计该零件的棒孔总数
+        for (auto& h : info.holes)
+            if (h.first == HoleType::RodHole) ++totalRodHoles;
+
+        // 统计该滑块已和多少根“棒”建立了 mate（每根棒占用一个孔）
+        // mates 里记录了 sliderName / rodName / holeIndex；rodName 的类型需确认为 Rod
+        if (info.type == PartType::Slider) {
+            const auto& mates = m_graph->GetMates();
+            for (const auto& m : mates) {
+                auto itRod = parts.find(m.rodName);
+                if (m.sliderName == name && itRod != parts.end()
+                    && itRod->second.type == PartType::Rod) {
+                    ++usedRodHoles;
+                }
+            }
+        }
+
+        if (info.type == PartType::Slider && totalRodHoles > 0 && usedRodHoles >= totalRodHoles) continue;
 
         m_tableA->insertRow(row);
 
-        // ✅ 用 UTF-8 解析 std::string，并且去除首尾空格（安全）
-        QString qName = QString::fromUtf8(name.c_str()).trimmed();
-        m_tableA->setItem(row, 0, new QTableWidgetItem(qName));
+        // ✅ 改动: 编号显示 + UserRole 保存真实名
+        QString real = QString::fromUtf8(name.c_str()).trimmed();
+        QString shown = displayLabel(real, info.type); // “棒1”“滑块2”…
+        auto* itemName = new QTableWidgetItem(shown);
+        itemName->setData(Qt::UserRole, real); // 真实名
+        m_tableA->setItem(row, 0, itemName);
 
         // 类型转中文显示或英文都可以
         QString typeStr;
@@ -107,8 +160,8 @@ void AssemblyDialog::populatePartATable()
 
         m_tableA->setItem(row, 1, new QTableWidgetItem(typeStr));
 
-        // ✅ 调试输出，验证每一行内容
-        qDebug() << "[A表]" << qName << typeStr;
+        // ✅ 调试输出，验证每一行内容（显示名 + 真实名）
+        qDebug() << "[A表]" << shown << "(real=" << real << ")" << typeStr;
 
         row++;
     }
@@ -122,8 +175,9 @@ void AssemblyDialog::onPartASelected(int row, int col)
 
     if (!m_tableA->item(row, 0)) return;
 
-    // ✅ 从 A 表取出零件名（UTF-8 + 去空格）
-    QString qName = m_tableA->item(row, 0)->text().trimmed();
+    // ✅ 改动: 从 UserRole 取真实名
+    // QString qName = m_tableA->item(row, 0)->text().trimmed();
+    QString qName = m_tableA->item(row, 0)->data(Qt::UserRole).toString();
     m_selectedA = qName.toUtf8().constData();
 
     qDebug() << "\n[A表] 选中零件:" << qName << "→ m_selectedA =" << QString::fromUtf8(m_selectedA.c_str());
@@ -173,17 +227,20 @@ void AssemblyDialog::populatePartBTable(const std::string& partA)
 
         // === 添加到表格 ===
         m_tableB->insertRow(row);
-        QString qName = QString::fromUtf8(name.c_str()).trimmed();
+        QString real = QString::fromUtf8(name.c_str()).trimmed();
+        QString shown = displayLabel(real, infoB.type);
         QString typeStr = (infoB.type == PartType::Rod)
             ? QStringLiteral("Rod")
             : (infoB.type == PartType::Slider)
             ? QStringLiteral("Slider")
             : QStringLiteral("Screw");
 
-        m_tableB->setItem(row, 0, new QTableWidgetItem(qName));
+        auto* it0 = new QTableWidgetItem(shown); // 0列显示编号后名字
+        it0->setData(Qt::UserRole, real);        // UserRole 存真实名
+        m_tableB->setItem(row, 0, it0);
         m_tableB->setItem(row, 1, new QTableWidgetItem(typeStr));
 
-        qDebug() << "[B表] 添加匹配项:" << qName << typeStr;
+        qDebug() << "[B表] 添加匹配项:" << shown << "(real=" << real << ")" << typeStr;
         row++;
     }
 }
@@ -196,8 +253,9 @@ void AssemblyDialog::onPartBSelected(int row, int col)
 
     if (!m_tableB->item(row, 0)) return;
 
-    // 从 B 表取出零件名（UTF-8 + 去空格）
-    QString qName = m_tableB->item(row, 0)->text().trimmed();
+    // ✅ 改动: 从 UserRole 取真实名
+    // QString qName = m_tableB->item(row, 0)->text().trimmed();
+    QString qName = m_tableB->item(row, 0)->data(Qt::UserRole).toString();
     m_selectedB = qName.toUtf8().constData();
 
     qDebug() << "\n[B表] 选中零件:" << qName << "→ m_selectedB =" << QString::fromUtf8(m_selectedB.c_str());
@@ -248,6 +306,11 @@ void AssemblyDialog::populateHoleTable(const std::string& partB)
     const PartInfo& info = it->second;
     qDebug() << "[C表] 找到孔数量:" << info.holes.size();
 
+    // ★ 取得当前滑块的显示编号
+    QString sliderReal = QString::fromUtf8(partB.c_str());
+    int sliderIdx = ensureDisplayIndex(sliderReal, PartType::Slider); // 已存在则复用
+    QString sliderShown = QStringLiteral("滑块") + QString::number(sliderIdx);
+
     int idx = 0;
     for (size_t i = 0; i < info.holes.size(); ++i)
     {
@@ -257,11 +320,16 @@ void AssemblyDialog::populateHoleTable(const std::string& partB)
         m_tableC->insertRow(idx);
 
         QString hType = (holeType == HoleType::RodHole ? QStringLiteral("RodHole") : QStringLiteral("ScrewHole"));
+        QString holeShown = (holeType == HoleType::RodHole)
+            ? QStringLiteral("%1的棒孔%2").arg(sliderShown).arg(idx + 1)
+            : QStringLiteral("%1的螺孔%2").arg(sliderShown).arg(idx + 1);
+
         m_tableC->setItem(idx, 0, new QTableWidgetItem(hType));
         m_tableC->setItem(idx, 1, new QTableWidgetItem(QString::number(radius, 'f', 3)));
-        m_tableC->setItem(idx, 2, new QTableWidgetItem(QString::number(idx)));
+        // ✅ 改动: 第3列改成“滑块X的棒孔Y / 螺孔Y”
+        m_tableC->setItem(idx, 2, new QTableWidgetItem(holeShown));
 
-        qDebug() << "[C表] 添加孔" << idx << "类型:" << hType << "半径:" << radius;
+        qDebug() << "[C表] 添加孔" << idx << "类型:" << hType << "半径:" << radius << "显示:" << holeShown;
         idx++;
     }
 }
@@ -315,8 +383,8 @@ void AssemblyDialog::onFinishClicked()
     }
 
     qDebug() << "[装配完成] 准备调用装配函数 →"
-        << "A:" << QString::fromStdString(m_selectedA)
-        << "B:" << QString::fromStdString(m_selectedB)
+        << "A:" << QString::fromUtf8(m_selectedA.c_str())
+        << "B:" << QString::fromUtf8(m_selectedB.c_str())
         << "孔:" << m_selectedHoleIndex;
 
     const auto& parts = m_graph->GetParts();
@@ -341,14 +409,13 @@ void AssemblyDialog::onFinishClicked()
         if (pSlider && pScrew) {
             auto res = mgr.AssembleScrewToSlider(screwNameSpecial, sliderNameSpecial, m_selectedHoleIndex);
             if (!res.success) {
-                QMessageBox::critical(this, QStringLiteral("装配"), QString::fromStdString(res.message));
+                QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("螺钉装配失败"));
                 return;
             }
             QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，螺钉约束已建立。"));
             populatePartATable();
             m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
             m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-            accept();
             return;
         }
     }
@@ -361,7 +428,7 @@ void AssemblyDialog::onFinishClicked()
     if (!sliderName.empty()) {
         auto res = mgr.AssembleSliderToRod(sliderName, rodName, m_selectedHoleIndex);
         if (!res.success) {
-            QMessageBox::critical(this, QStringLiteral("装配"), QString::fromStdString(res.message));
+            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("滑块-棒装配失败"));
             return;
         }
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，滑块→棒 约束已建立。"));
@@ -383,7 +450,6 @@ void AssemblyDialog::onFinishClicked()
     populatePartATable();
     m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
     m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-    accept();
 }
 
 // ---------------- 工具函数 ----------------

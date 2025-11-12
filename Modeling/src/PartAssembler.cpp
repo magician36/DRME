@@ -7,6 +7,13 @@
 #include <QDebug>
 #include <Bnd_Box.hxx> // 新增: 计算包围盒以获中心
 #include <BRepBndLib.hxx> // 新增: 生成包围盒
+#include <Precision.hxx>
+#if __has_include(<IntCurvesFace_ShapeIntersector.hxx>)
+  #include <IntCurvesFace_ShapeIntersector.hxx>
+  #define HAS_OCCT_SHAPEINTERSECTOR 1
+#else
+  #define HAS_OCCT_SHAPEINTERSECTOR 0
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -73,9 +80,9 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
 
     // === 如果方向反向，翻转源轴 ===
     if (sourceAxis.Direction().Dot(targetAxis.Direction()) < 0) {
-        gp_Dir flippedDir(-sourceAxis.Direction().X(), 
-                         -sourceAxis.Direction().Y(), 
-                         -sourceAxis.Direction().Z());
+        gp_Dir flippedDir(-sourceAxis.Direction().X(),
+            -sourceAxis.Direction().Y(),
+            -sourceAxis.Direction().Z());
         sourceAxis = gp_Ax1(sourceAxis.Location(), flippedDir);
     }
 
@@ -93,51 +100,132 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         return false;
     }
 
-    // === 新增：螺钉装配到滑块螺钉孔时，对齐“螺钉整体中心”到“孔中心”且保持同轴 ===
-    if (infoA.type == PartType::Screw && infoB.type == PartType::Slider && targetHoleType == HoleType::ScrewHole) {
-        // 计算螺钉当前局部包围盒中心（已变换后）
+    // === 螺钉装配到滑块：无论当前选的是不是螺孔，都自动插入最近的螺孔 ===
+    if (infoA.type == PartType::Screw && infoB.type == PartType::Slider)
+    {
+        // ---- 0) 决定要用的孔轴：优先当前目标是螺孔；否则在滑块上找最近的螺孔 ----
+        gp_Ax1 holeAxisW = targetAxis;                // 默认用当前目标轴
+        gp_Pnt refPointW = targetAxis.Location();     // 参考点（用于“最近螺孔”）
+        bool foundScrewHole = (targetHoleType == HoleType::ScrewHole);
+
+        if (!foundScrewHole) {
+            // 参考点改用“螺钉当前中心”，更稳
+            Bnd_Box sb; sb.SetGap(0.0);
+            BRepBndLib::Add(infoA.model->Shape(), sb);
+            if (!sb.IsVoid()) {
+                Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; sb.Get(xmin,ymin,zmin,xmax,ymax,zmax);
+                gp_Pnt c((xmin+xmax)*0.5,(ymin+ymax)*0.5,(zmin+zmax)*0.5);
+                c.Transform(infoA.model->LocalTransformation());
+                refPointW = c;
+            }
+
+            // 在滑块上找“类型=螺孔”的轴，取与 refPointW 最近的一个
+            Standard_Real best2 = RealLast();
+            for (size_t i=0; i<infoB.holes.size(); ++i) {
+                if (infoB.holes[i].first != HoleType::ScrewHole) continue;
+                gp_Ax1 ax = infoB.holes[i].second;
+                gp_Trsf LB = infoB.model->LocalTransformation();
+                ax.Transform(LB);
+                Standard_Real d2 = refPointW.SquareDistance(ax.Location());
+                if (d2 < best2) { best2 = d2; holeAxisW = ax; foundScrewHole = true; }
+            }
+        }
+
+        // ---- 1) 把“螺钉整体中心”对到“孔中心”（纯平移）----
         Bnd_Box box; box.SetGap(0.0);
         BRepBndLib::Add(infoA.model->Shape(), box);
-        if (!box.IsVoid()) {
-            Standard_Real xmin, ymin, zmin, xmax, ymax, zmax;
-            box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
-            gp_Pnt screwCenter((xmin + xmax) * 0.5, (ymin + ymax) * 0.5, (zmin + zmax) * 0.5);
-            gp_Trsf curL = infoA.model->LocalTransformation();
-            screwCenter.Transform(curL);
-            gp_Pnt holeCenter = targetAxis.Location();
-            gp_Vec shift(screwCenter, holeCenter); // 需要补偿的平移
-            gp_Vec curT(curL.TranslationPart());
-            gp_Trsf newL = curL; newL.SetTranslationPart(curT + shift);
-            infoA.model->SetLocalTransformation(newL);
-            if (!m_context.IsNull()) m_context->Redisplay(infoA.model, Standard_False);
-            qDebug().noquote() << QString("[PartAssembler] 螺钉中心与孔中心已对齐，Δ=(%1,%2,%3)")
-                .arg(shift.X(),0,'f',3).arg(shift.Y(),0,'f',3).arg(shift.Z(),0,'f',3);
-            // ==== 追加：沿孔轴方向打入一定距离（保持不修改原有代码与注释） ====
-            // 依据螺钉包围盒在轴方向的长度，取 30% 作为打入距离
-            gp_Dir axisDir = targetAxis.Direction();
-            double minProj = 1e100, maxProj = -1e100;
-            for (int ix=0; ix<2; ++ix)
-                for (int iy=0; iy<2; ++iy)
-                    for (int iz=0; iz<2; ++iz) {
-                        gp_Pnt p(ix?xmax:xmin, iy?ymax:ymin, iz?zmax:zmin);
-                        p.Transform(curL); // 变换到世界再投影
-                        double proj = p.X()*axisDir.X() + p.Y()*axisDir.Y() + p.Z()*axisDir.Z();
-                        if (proj < minProj) minProj = proj;
-                        if (proj > maxProj) maxProj = proj;
-                    }
-            double screwLenAxis = std::max(0.0, maxProj - minProj);
-            double depthRatio = 0.30; // 打入比例，可调
-            double depth = screwLenAxis * depthRatio;
-            // 负方向作为“向里”
-            gp_Vec push = gp_Vec(axisDir.XYZ()) * (-depth);
-            gp_Trsf afterPush = infoA.model->LocalTransformation();
-            gp_Vec curT2(afterPush.TranslationPart());
-            afterPush.SetTranslationPart(curT2 + push);
-            infoA.model->SetLocalTransformation(afterPush);
-            if (!m_context.IsNull()) m_context->Redisplay(infoA.model, Standard_False);
-            qDebug().noquote() << QString("[PartAssembler] 螺钉沿孔轴打入距离=%1 (占轴向长度=%2%)")
-                .arg(depth,0,'f',3).arg(depthRatio*100.0,0,'f',1);
+        if (box.IsVoid()) return true;
+
+        Standard_Real xmin,ymin,zmin,xmax,ymax,zmax;
+        box.Get(xmin,ymin,zmin,xmax,ymax,zmax);
+
+        gp_Trsf Lcur = infoA.model->LocalTransformation();
+        gp_Pnt screwCenterLocal((xmin+xmax)*0.5,(ymin+ymax)*0.5,(zmin+zmax)*0.5);
+        gp_Pnt screwCenter = screwCenterLocal.Transformed(Lcur);
+        gp_Pnt holeCenter  = holeAxisW.Location();
+        gp_Vec shift(screwCenter, holeCenter);
+
+        gp_Trsf L1 = Lcur; L1.SetTranslationPart(gp_Vec(Lcur.TranslationPart()) + shift);
+        infoA.model->SetLocalTransformation(L1);
+
+        // ---- 2) 计算推进方向、螺钉轴向长度、入口/出口位置 ----
+        const gp_Dir axDir = holeAxisW.Direction();
+
+        // 2.1 方向：沿与“中心->孔中心”同向的轴向前进
+        const double sign = (gp_Vec(axDir.XYZ()).Dot(shift) >= 0.0) ? +1.0 : -1.0;
+
+        // 2.2 螺钉轴向长度（用对齐后的位置）
+        gp_Trsf Lc = infoA.model->LocalTransformation();
+        auto proj = [&](const gp_Pnt& p)->double { return p.X()*axDir.X() + p.Y()*axDir.Y() + p.Z()*axDir.Z(); };
+
+        double minProj =  1e100, maxProj = -1e100;
+        for (int ix=0; ix<2; ++ix)
+        for (int iy=0; iy<2; ++iy)
+        for (int iz=0; iz<2; ++iz) {
+            gp_Pnt p(ix?xmax:xmin, iy?ymax:ymin, iz?zmax:zmin);
+            p.Transform(Lc);
+            const double v = proj(p);
+            if (v < minProj) minProj = v;
+            if (v > maxProj) maxProj = v;
         }
+        const double screwLenAxis = std::max(0.0, maxProj - minProj);
+        const double sFront = (sign > 0.0) ? maxProj : minProj; // 沿推进方向的“前端”投影
+
+        // 2.3 入口/出口（优先几何求交；失败用滑块包围盒兜底）
+        double sEnter = proj(holeCenter), sExit = sEnter;
+        bool haveThickness = false;
+
+#if HAS_OCCT_SHAPEINTERSECTOR
+        try {
+            IntCurvesFace_ShapeIntersector isec;
+            isec.Load(infoB.model->Shape(), Precision::Confusion());
+            isec.Perform(gp_Lin(holeAxisW), -Precision::Infinite(), Precision::Infinite());
+            if (isec.NbPnt() >= 2) {
+                const double a = proj(isec.Pnt(1)), b = proj(isec.Pnt(2));
+                sEnter = std::min(a,b); sExit = std::max(a,b);
+                haveThickness = true;
+            }
+        } catch(...) { /* ignore */ }
+#endif
+        if (!haveThickness) {
+            Bnd_Box b; b.SetGap(0.0);
+            BRepBndLib::Add(infoB.model->Shape(), b);
+            Standard_Real bxmin,bymin,bzmin,bxmax,bymax,bzmax;
+            b.Get(bxmin,bymin,bzmin,bxmax,bymax,bzmax);
+            gp_Trsf LB = infoB.model->LocalTransformation();
+            double Bmin= 1e100, Bmax=-1e100;
+            for (int ix=0; ix<2; ++ix)
+            for (int iy=0; iy<2; ++iy)
+            for (int iz=0; iz<2; ++iz) {
+                gp_Pnt p(ix?bxmax:bxmin, iy?bymax:bymin, iz?bzmax:bzmin);
+                p.Transform(LB);
+                const double v = proj(p);
+                if (v < Bmin) Bmin = v; if (v > Bmax) Bmax = v;
+            }
+            // 把孔中心当作中点附近
+            const double mid = (Bmin + Bmax) * 0.5;
+            const double half= (Bmax - Bmin) * 0.5;
+            sEnter = mid - half; sExit = mid + half;
+        }
+
+        // ---- 3) 目标：让“螺钉前端”进入入口面内的咬合深度 ----
+        // 插到一半：把前端推进到孔厚度的中面
+        const double thickness = std::max(0.0, sExit - sEnter);
+        const double sTarget   = 0.5 * (sEnter + sExit);  // 孔内“中面”
+        const double delta     = sTarget - sFront;        // 推进到中面
+
+        gp_Trsf L2 = infoA.model->LocalTransformation();
+        gp_Vec  t2(L2.TranslationPart());
+        gp_Vec  push = gp_Vec(axDir.XYZ()) * delta;
+        L2.SetTranslationPart(t2 + push);
+        infoA.model->SetLocalTransformation(L2);
+
+        if (!m_context.IsNull()) m_context->Redisplay(infoA.model, Standard_False);
+        qDebug().noquote() << QString("[PartAssembler] 自动插入到螺孔：δ=%1, 厚度=%2, len=%3%4")
+            .arg(delta,0,'f',3).arg(thickness,0,'f',3).arg(screwLenAxis,0,'f',3)
+            .arg(foundScrewHole?QString():QString(" (fallback)"));
+
+        return true;
     }
 
     // === 更新约束关系 ===
@@ -153,21 +241,21 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
 gp_Ax2 PartAssembler::BuildFrame(const gp_Ax1& axis) const
 {
     gp_Dir zDir = axis.Direction();
-    
+
     // 选择参考方向（避免与 Z 轴平行）
     gp_Dir refDir = (std::abs(zDir.Z()) < 0.9) ? gp_Dir(0, 0, 1) : gp_Dir(1, 0, 0);
-    
+
     gp_Vec vz(zDir);
     gp_Vec vref(refDir);
     gp_Vec vx = vz.Crossed(vref);
-    
+
     // 如果叉积太小，换一个参考方向
     if (vx.Magnitude() < 1e-6) {
         refDir = gp_Dir(0, 1, 0);
         vref = gp_Vec(refDir);
         vx = vz.Crossed(vref);
     }
-    
+
     gp_Dir xDir(vx);  // 自动归一化
     return gp_Ax2(axis.Location(), zDir, xDir);
 }
@@ -182,14 +270,14 @@ bool PartAssembler::FindSourceAxis(const PartInfo& partInfo, HoleType targetHole
             return true;
         }
     }
-    
+
     // 如果没有匹配的孔，使用主轴
     if (!partInfo.model.IsNull()) {
         outAxis = partInfo.model->MainAxis();
         qDebug() << "[PartAssembler] 未找到匹配孔类型，使用主轴";
         return true;
     }
-    
+
     return false;
 }
 
@@ -199,19 +287,19 @@ bool PartAssembler::ApplyTransformation(PartInfo& partInfo, const gp_Trsf& trsf)
     try {
         // 应用变换到模型
         partInfo.model->SetLocalTransformation(trsf);
-        
+
         // 刷新显示
         if (!m_context.IsNull()) {
             m_context->Redisplay(partInfo.model, Standard_True);
         }
-        
+
         // 更新所有孔轴到新位置（保持后续再次选择正确）
         for (auto& hole : partInfo.holes) {
             gp_Ax1 axis = hole.second;
             axis.Transform(trsf);
             hole.second = axis;
         }
-        
+
         return true;
     }
     catch (const std::exception& e) {
@@ -230,7 +318,7 @@ void PartAssembler::UpdateConstraints(PartInfo& partA, const std::string& partBN
     // 记录约束（允许重复覆盖）
     partA.constraint.targetPart = partBName;
     partA.constraint.type = holeType;
-    
+
     // 添加连接关系（防止重复）
     auto& connections = partA.connectedParts;
     if (std::find(connections.begin(), connections.end(), partBName) == connections.end()) {
@@ -239,26 +327,26 @@ void PartAssembler::UpdateConstraints(PartInfo& partA, const std::string& partBN
 }
 
 // === 计算并输出装配信息 ===
-void PartAssembler::LogAssemblyInfo(const std::string& partA, const std::string& partB, 
-                                    int holeIndex, const gp_Ax1& sourceAxis, 
-                                    const gp_Ax1& targetAxis) const
+void PartAssembler::LogAssemblyInfo(const std::string& partA, const std::string& partB,
+    int holeIndex, const gp_Ax1& sourceAxis,
+    const gp_Ax1& targetAxis) const
 {
     // 计算位移长度
     double moveLen = sourceAxis.Location().Distance(targetAxis.Location());
-    
+
     // 计算角度差
     double angle = sourceAxis.Direction().Angle(targetAxis.Direction());
     double angleDeg = angle * 180.0 / M_PI;
-    
+
     qDebug().noquote() << QString("[PartAssembler] ✅ 装配完成:");
     qDebug().noquote() << QString("  源零件: %1").arg(QString::fromStdString(partA));
     qDebug().noquote() << QString("  目标零件: %1").arg(QString::fromStdString(partB));
     qDebug().noquote() << QString("  目标孔索引: %1").arg(holeIndex);
     qDebug().noquote() << QString("  位移距离: %1 mm").arg(moveLen, 0, 'f', 3);
     qDebug().noquote() << QString("  角度调整: %1°").arg(angleDeg, 0, 'f', 2);
-    
-    std::cout << "[PartAssembler] " << partA << " -> " << partB 
-              << " | 孔=" << holeIndex 
-              << " | 位移=" << moveLen 
-              << " | 角度=" << angle << std::endl;
+
+    std::cout << "[PartAssembler] " << partA << " -> " << partB
+        << " | 孔=" << holeIndex
+        << " | 位移=" << moveLen
+        << " | 角度=" << angle << std::endl;
 }
