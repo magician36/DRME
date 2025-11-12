@@ -480,7 +480,7 @@ Ui_MainWindow::Ui_MainWindow()
      // 嵌入自定义部件
      auto* partWidget = new PartLibraryDockWidget(partDock);
      //零件库根目录
-     partWidget->setBaseDir(QStringLiteral("C:/Users/Administrator/Desktop/stp/parts"));
+     partWidget->setBaseDir(QStringLiteral("E:/1"));
      partWidget->reload();
 
      partDock->setWidget(partWidget);
