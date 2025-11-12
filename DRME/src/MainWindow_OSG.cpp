@@ -473,18 +473,79 @@ Ui_MainWindow::Ui_MainWindow()
 
  	 MainWindow->addDockWidget(Qt::LeftDockWidgetArea, FeatureItems);
 
-     // === 右侧：零件库 Dock ===
-     auto* partDock = new QDockWidget(QStringLiteral("零件库"), MainWindow);
-     partDock->setAllowedAreas(Qt::RightDockWidgetArea);
+// === 右侧零件库工具栏 ===
+     QToolBar* partToolBar = addToolBar(tr("零件库"));
+     partToolBar->setObjectName(QStringLiteral("PartLibraryToolBar"));
+     partToolBar->setOrientation(Qt::Vertical);
+     partToolBar->setIconSize(QSize(48, 48));
+     partToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+     partToolBar->setMinimumWidth(90);
+     partToolBar->setVisible(true);
+     MainWindow->addToolBar(Qt::RightToolBarArea, partToolBar);
 
-     // 嵌入自定义部件
-     auto* partWidget = new PartLibraryDockWidget(partDock);
-     //零件库根目录
-     partWidget->setBaseDir(QStringLiteral("E:/1"));
-     partWidget->reload();
+     // === 路径设置 ===
+     QString baseDir = QStringLiteral("C:/Users/Administrator/Desktop/stp/parts/");
+     QString iconBasePath = QStringLiteral("C:/Users/Administrator/Desktop/demo/icons/");
 
-     partDock->setWidget(partWidget);
-     MainWindow->addDockWidget(Qt::RightDockWidgetArea, partDock);
+     // 工具栏按钮列表
+     struct PartButtonInfo {
+         QString name;
+         QString folder;
+         QString icon;
+     };
+     QList<PartButtonInfo> parts = {
+         {QStringLiteral("棒 (Rod)"), QStringLiteral("Rod"), QStringLiteral("rod.png")},
+         {QStringLiteral("滑块 (Slider)"), QStringLiteral("Slider"), QStringLiteral("slider.png")},
+         {QStringLiteral("螺钉 (Screw)"), QStringLiteral("Screw"), QStringLiteral("screw.png")}
+     };
+
+     for (const PartButtonInfo& info : parts)
+     {
+         // 创建主按钮
+         QAction* partAction = new QAction(QIcon(iconBasePath + info.icon), info.name, this);
+         partToolBar->addAction(partAction);
+
+         // 为该按钮创建弹出菜单
+         QMenu* menu = new QMenu(partToolBar);
+         QString folderPath = baseDir + info.folder;
+
+         QDir dir(folderPath);
+         if (dir.exists()) {
+             QStringList filters;
+             filters << QStringLiteral("*.stp") << QStringLiteral("*.step") << QStringLiteral("*.stl");
+             QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::NoDotAndDotDot);
+
+             for (const QFileInfo& f : files) {
+                 QAction* fileAct = new QAction(f.fileName(), menu);
+                 QObject::connect(fileAct, &QAction::triggered, [this, f]() {
+                     OCCSubWindow* subWin = (OCCSubWindow*)mdiArea->currentSubWindow();
+                     if (!subWin) {
+                         QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先创建一个窗口！"));
+                         return;
+                     }
+                     OCCTWidget* pOCCWidget = (OCCTWidget*)subWin->widget();
+                     if (!pOCCWidget) return;
+
+                     OCCModeling::LoadModelToWidget(f.absoluteFilePath(), pOCCWidget, featureTreeWidget, partGraph);
+                     qDebug().noquote() << QStringLiteral("[PartLibrary] ✅ 加载零件: %1").arg(f.absoluteFilePath());
+                     });
+                 menu->addAction(fileAct);
+             }
+         }
+         else {
+             QAction* emptyAct = new QAction(QStringLiteral("(目录不存在)"), menu);
+             emptyAct->setEnabled(false);
+             menu->addAction(emptyAct);
+         }
+
+         // 绑定点击事件 -> 弹出菜单
+         QObject::connect(partAction, &QAction::triggered, [partToolBar, menu, partAction]() {
+             QWidget* w = partToolBar->widgetForAction(partAction);
+             if (!w) return;
+             QPoint pos = w->mapToGlobal(QPoint(w->width(), w->height() / 2));  // 按钮右侧弹出
+             menu->exec(pos);
+             });
+     }
 
  }
 

@@ -63,7 +63,7 @@ private:
     void RebuildCylFacesFromShape(const TopoDS_Shape& s);
 
 private:
-    bool m_axesVisible = true;
+	bool m_axesVisible = false;         //轴线显示开关
     std::vector<gp_Ax1> m_axes;         //每条轴线
     std::vector<double> m_radii;        //轴线半径
     std::vector<HoleType> m_holeTypes; // 每条轴线的类型
