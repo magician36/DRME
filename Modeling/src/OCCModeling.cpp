@@ -63,6 +63,20 @@ void OCCModeling::LoadModelToWidget(
             root->addChild(importedItem);
         }
     }
+    // === 询问零件类型 === 
+    QStringList types = { QStringLiteral("Rod"), QStringLiteral("Slider"), QStringLiteral("Screw") };
+    bool ok = false;
+    QString selectedType = QInputDialog::getItem( 
+        pOCCWidget,
+        QStringLiteral("零件类型"),
+        QStringLiteral("请选择该零件的类型："),
+        types, 0, false, &ok);
+    if (!ok) return;
+    PartType partType = PartType::Rod;
+    if (selectedType.contains(QStringLiteral("Slider")))
+        partType = PartType::Slider;
+    else if (selectedType.contains(QStringLiteral("Screw"))) 
+        partType = PartType::Screw;
 
     // === 登记到 PartGraph ===
     QString partName = QFileInfo(filePath).baseName();
@@ -70,7 +84,7 @@ void OCCModeling::LoadModelToWidget(
     std::string safeName(utf8Name.constData());
 
     const auto& radii = model->GetAllRadii();
-    partGraph.AddPart(safeName, PartType::Rod, model, (radii.empty() ? 0.0 : radii.front()));
+    partGraph.AddPart(safeName, partType, model, (radii.empty() ? 0.0 : radii.front()));
     partGraph.SaveToJson("C:/Users/Administrator/Desktop/stp/PartLibrary.json");
     partGraph.PrintSummary();
 

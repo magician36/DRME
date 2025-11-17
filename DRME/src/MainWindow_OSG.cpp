@@ -542,7 +542,7 @@ Ui_MainWindow::Ui_MainWindow()
          QObject::connect(partAction, &QAction::triggered, [partToolBar, menu, partAction]() {
              QWidget* w = partToolBar->widgetForAction(partAction);
              if (!w) return;
-             QPoint pos = w->mapToGlobal(QPoint(w->width(), w->height() / 2));  // 按钮右侧弹出
+             QPoint pos = w->mapToGlobal(QPoint(-menu->sizeHint().width(), w->height() / 2));  // 按钮左侧弹出
              menu->exec(pos);
              });
      }

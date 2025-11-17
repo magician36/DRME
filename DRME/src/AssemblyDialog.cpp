@@ -10,6 +10,7 @@
 #include <TopoDS.hxx>
 #include <QHash> // ★ 新增: 显示名编号缓存
 #include <QString> // ★ 新增: 明确包含 QString 以避免构造访问问题
+#include <MainWindow_OSG.h>
 
 // ================= 匿名命名空间：稳定显示编号缓存 =================
 namespace {
@@ -363,13 +364,19 @@ void AssemblyDialog::onHoleSelected(int row, int col)
     // 安全检查孔索引
     if (row < 0 || row >= (int)partInfo.holes.size()) return;
 
-    // 获取当前孔信息
-    const auto& hole = partInfo.holes[row];
-    const auto& axis = hole.second;
+    // === 局部孔轴线 ===
+    gp_Ax1 localAxis = partInfo.holes[row].second;
+
+    // === 转换为世界坐标 ===
+    gp_Trsf trsf = partInfo.model->LocalTransformation();
+    gp_Ax1 worldAxis = localAxis;
+    worldAxis.Transform(trsf);
+
     double radius = (row < partInfo.holeRadii.size()) ? partInfo.holeRadii[row] : 0.0;
 
-    // === 高亮孔的圆柱面 ===
-    highlightHoleFace(partInfo.model, axis, radius);
+    // === 用世界轴线去找孔 ===
+    highlightHoleFace(partInfo.model, worldAxis, radius);
+
 }
 
 // ---------------- 完成按钮 ----------------
@@ -498,19 +505,30 @@ void AssemblyDialog::highlightPart(const Handle(AIS_ModelWithAxis)& model)
 }
 
 // 高亮孔的圆柱面
-void AssemblyDialog::highlightHoleFace(const Handle(AIS_ModelWithAxis)& model, const gp_Ax1& axis, double radius)
+void AssemblyDialog::highlightHoleFace(const Handle(AIS_ModelWithAxis)& model,
+    const gp_Ax1& axisWorld,
+    double radius)
 {
     if (m_context.IsNull() || m_view.IsNull()) return;
-    if (m_view->Window().IsNull()) return;  // ✅ 新增安全检查
+    if (m_view->Window().IsNull()) return;
     if (model.IsNull()) return;
 
     try {
-        TopoDS_Shape shape = model->Shape();
+        // 1️⃣ 原始局部形状
+        TopoDS_Shape shapeLocal = model->Shape();
+
+        // 2️⃣ 应用模型当前世界变换
+        gp_Trsf trsf = model->LocalTransformation();
+        BRepBuilderAPI_Transform brepTr(shapeLocal, trsf);
+        TopoDS_Shape shapeWorld = brepTr.Shape();
+
         double minDist = 1e9;
         TopoDS_Face bestFace;
 
-        for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
+        // 3️⃣ 在世界坐标的 shape 上查找圆柱面
+        for (TopExp_Explorer ex(shapeWorld, TopAbs_FACE); ex.More(); ex.Next()) {
             TopoDS_Face face = TopoDS::Face(ex.Current());
+
             TopLoc_Location loc;
             Handle(Geom_Surface) surf = BRep_Tool::Surface(face, loc);
             Handle(Geom_CylindricalSurface) cyl = Handle(Geom_CylindricalSurface)::DownCast(surf);
@@ -518,9 +536,10 @@ void AssemblyDialog::highlightHoleFace(const Handle(AIS_ModelWithAxis)& model, c
 
             gp_Ax1 ax = cyl->Axis();
             ax.Transform(loc.Transformation());
+
             double r = cyl->Radius();
 
-            double dist = axis.Location().Distance(ax.Location()) + std::abs(r - radius);
+            double dist = axisWorld.Location().Distance(ax.Location()) + fabs(r - radius);
             if (dist < minDist) {
                 minDist = dist;
                 bestFace = face;
@@ -532,13 +551,13 @@ void AssemblyDialog::highlightHoleFace(const Handle(AIS_ModelWithAxis)& model, c
             m_context->Display(m_highlightedFace, Standard_False);
             m_context->SetColor(m_highlightedFace, Quantity_NOC_YELLOW, Standard_False);
             m_context->Redisplay(m_highlightedFace, Standard_True);
-            //m_view->Redraw();
         }
     }
     catch (...) {
-        qWarning() << "[AssemblyDialog] highlightHoleFace() failed due to OpenGL context issue";
+        qWarning() << "[AssemblyDialog] highlightHoleFace() failed";
     }
 }
+
 
 AssemblyDialog::~AssemblyDialog()
 {

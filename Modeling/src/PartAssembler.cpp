@@ -79,11 +79,16 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
     }
 
     // === 如果方向反向，翻转源轴 ===
-    if (sourceAxis.Direction().Dot(targetAxis.Direction()) < 0) {
-        gp_Dir flippedDir(-sourceAxis.Direction().X(),
-            -sourceAxis.Direction().Y(),
-            -sourceAxis.Direction().Z());
-        sourceAxis = gp_Ax1(sourceAxis.Location(), flippedDir);
+// （更新逻辑：普通件保持同向；若为“螺钉 + 螺孔”则希望最终反向）
+    {
+        gp_Dir dirS = sourceAxis.Direction();
+        gp_Dir dirT = targetAxis.Direction();
+        const bool invertForScrew = (infoA.type == PartType::Screw && targetHoleType == HoleType::ScrewHole);
+        // XOR 逻辑：普通件 -> dot<0 时翻；螺钉(需反向) -> dot>=0 时翻
+        if (((dirS.Dot(dirT) < 0.0) ^ invertForScrew)) {
+            dirS.Reverse();
+            sourceAxis = gp_Ax1(sourceAxis.Location(), dirS);
+        }
     }
 
     // === 构造稳定参考坐标系 ===
