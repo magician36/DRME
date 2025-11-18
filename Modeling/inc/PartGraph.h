@@ -84,6 +84,9 @@ public:
     // 只读访问函数
     const std::map<std::string, PartInfo>& GetParts() const { return parts; }
 
+    // 新增：可变访问（允许外部在装配后更新 PartInfo）
+    std::map<std::string, PartInfo>& GetMutableParts() { return parts; }
+
     // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
     // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）
     const MateConstraint* FindRodMateForSlider(const std::string& sliderName) const;

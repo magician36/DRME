@@ -32,6 +32,10 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         std::cerr << "[PartAssembler] PartGraph 为空" << std::endl;
         return false;
     }
+    qDebug() << "[AssembleParts] 输入参数:"
+        << "moving =" << QString::fromStdString(partA)
+        << "fixed =" << QString::fromStdString(partB)
+        << "hole=" << holeIndexB;
 
     // 通过 friend 访问获取零件信息（可修改）
     auto& parts = m_graph->parts;
