@@ -384,3 +384,18 @@ void AIS_ModelWithAxis::RebuildCylFacesFromShape(const TopoDS_Shape& s)
         }
     }
 }
+
+// ⭐ 新增：从另一个模型复制轴线、半径和孔类型
+void AIS_ModelWithAxis::CloneAxisDataFrom(const Handle(AIS_ModelWithAxis)& other)
+{
+    if (other.IsNull())
+        return;
+
+    // 直接拷贝对方的轴线、半径、孔类型
+    m_axes = other->GetAllAxes();
+    m_radii = other->GetAllRadii();
+    m_holeTypes = other->GetAllHoleTypes();
+
+    // 根据当前 shape 重新匹配圆柱面，保证拾取正确
+    RebuildCylFacesFromShape(Shape());
+}

@@ -20,6 +20,8 @@ class AIS_ModelWithAxis : public AIS_ColoredShape
 public:
     AIS_ModelWithAxis(const TopoDS_Shape& shape, const std::string& axisFile);
 
+    // ? 新增：从另一个模型复制轴线、半径和孔类型
+    void CloneAxisDataFrom(const Handle(AIS_ModelWithAxis)& other);
 
     // 切换轴线显示
     void SetAxesVisible(bool visible);

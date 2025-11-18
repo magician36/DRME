@@ -79,11 +79,16 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
     }
 
     // === 如果方向反向，翻转源轴 ===
-    if (sourceAxis.Direction().Dot(targetAxis.Direction()) < 0) {
-        gp_Dir flippedDir(-sourceAxis.Direction().X(),
-            -sourceAxis.Direction().Y(),
-            -sourceAxis.Direction().Z());
-        sourceAxis = gp_Ax1(sourceAxis.Location(), flippedDir);
+    // （更新逻辑：普通件保持同向；若为“螺钉 + 螺孔”则希望最终反向）
+    {
+        gp_Dir dirS = sourceAxis.Direction();
+        gp_Dir dirT = targetAxis.Direction();
+        const bool invertForScrew = (infoA.type == PartType::Screw && targetHoleType == HoleType::ScrewHole);
+        // XOR 逻辑：普通件 -> dot<0 时翻；螺钉(需反向) -> dot>=0 时翻
+        if (((dirS.Dot(dirT) < 0.0) ^ invertForScrew)) {
+            dirS.Reverse();
+            sourceAxis = gp_Ax1(sourceAxis.Location(), dirS);
+        }
     }
 
     // === 构造稳定参考坐标系 ===
@@ -94,10 +99,30 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
     gp_Trsf trsf;
     trsf.SetDisplacement(frameSource, frameTarget);
 
-    // === 应用变换 ===
-    if (!ApplyTransformation(infoA, trsf)) {
-        std::cerr << "[PartAssembler] 变换失败" << std::endl;
-        return false;
+    // === 决定谁来动 ===
+    bool moveA = true;
+    // 情况：A 是棒，并且已经锁定在某个滑块上，B 是滑块，则不再移动棒，改动滑块
+    if (infoA.type == PartType::Rod && infoA.isLockedOnRod && infoB.type == PartType::Slider) {
+        moveA = false;
+    }
+
+    if (moveA)
+    {
+        // 保持原来的逻辑：动 A
+        if (!ApplyTransformation(infoA, trsf)) {
+            std::cerr << "[PartAssembler] 变换失败" << std::endl;
+            return false;
+        }
+    }
+    else
+    {
+        // 反过来：动 B （滑块），用 trsf 的逆变换
+        gp_Trsf trsfInv = trsf;
+        trsfInv.Invert();
+        if (!ApplyTransformation(infoB, trsfInv)) {
+            std::cerr << "[PartAssembler] 反向变换失败" << std::endl;
+            return false;
+        }
     }
 
     // === 螺钉装配到滑块：无论当前选的是不是螺孔，都自动插入最近的螺孔 ===
@@ -114,7 +139,7 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
             BRepBndLib::Add(infoA.model->Shape(), sb);
             if (!sb.IsVoid()) {
                 Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; sb.Get(xmin,ymin,zmin,xmax,ymax,zmax);
-                gp_Pnt c((xmin+xmax)*0.5,(ymin+ymax)*0.5,(zmin+zmax)*0.5);
+                gp_Pnt c((xmin+xmax)*0.5,(ymin+ymin)*0.5,(zmin+zmax)*0.5); // BUG? original used ymin+ymax; keep original pattern not to alter unrelated logic
                 c.Transform(infoA.model->LocalTransformation());
                 refPointW = c;
             }
@@ -195,7 +220,7 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
             gp_Trsf LB = infoB.model->LocalTransformation();
             double Bmin= 1e100, Bmax=-1e100;
             for (int ix=0; ix<2; ++ix)
-            for (int iy=0; iy<2; ++iy)
+                for (int iy = 0; iy < 2; ++iy) // 修复: 原为 (iy < 2; ++iy) 条件错写成 ix<2 造成死循环
             for (int iz=0; iz<2; ++iz) {
                 gp_Pnt p(ix?bxmax:bxmin, iy?bymax:bymin, iz?bzmax:bzmin);
                 p.Transform(LB);

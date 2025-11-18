@@ -4,6 +4,7 @@
 #include <map>
 #include <gp_Ax1.hxx>
 #include <json.hpp>
+#include <AIS_InteractiveContext.hxx>
 
 class AIS_ModelWithAxis;
 class PartAssembler;  // 前向声明
@@ -84,11 +85,15 @@ public:
     // 只读访问函数
     const std::map<std::string, PartInfo>& GetParts() const { return parts; }
 
-    // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
-    // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）
+    // === 新增：查询"滑块绑定的棒轴 & 螺钉列表" ===
+    // 获取该滑块对应的"棒"装配（若有），用于得到棒轴（世界）
     const MateConstraint* FindRodMateForSlider(const std::string& sliderName) const;
-    // 获取与该滑块装配的“螺钉”名称列表（用作刚体联动）
+    // 获取与该滑块装配的"螺钉"名称列表（用作刚体联动）
     std::vector<std::string> GetScrewsForSlider(const std::string& sliderName) const;
+    
+    // === 复制滑块（保留位姿 + Rod 约束） ===
+    std::string DuplicateSliderWithRodMates(const std::string& sliderName,
+        const Handle(AIS_InteractiveContext)& context);
     
     // 允许 PartAssembler 访问私有成员
     friend class PartAssembler;

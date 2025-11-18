@@ -484,7 +484,7 @@ Ui_MainWindow::Ui_MainWindow()
      MainWindow->addToolBar(Qt::RightToolBarArea, partToolBar);
 
      // === 路径设置 ===
-     QString baseDir = QStringLiteral("C:/Users/Administrator/Desktop/stp/parts/");
+     QString baseDir = QStringLiteral("C:/Users/Administrator/Desktop/demo/DRME/stp/parts/");
      QString iconBasePath = QStringLiteral("C:/Users/Administrator/Desktop/demo/icons/");
 
      // 工具栏按钮列表
@@ -542,7 +542,7 @@ Ui_MainWindow::Ui_MainWindow()
          QObject::connect(partAction, &QAction::triggered, [partToolBar, menu, partAction]() {
              QWidget* w = partToolBar->widgetForAction(partAction);
              if (!w) return;
-             QPoint pos = w->mapToGlobal(QPoint(w->width(), w->height() / 2));  // 按钮右侧弹出
+             QPoint pos = w->mapToGlobal(QPoint(-menu->sizeHint().width(), w->height() / 2));  // 按钮左侧弹出
              menu->exec(pos);
              });
      }
