@@ -82,6 +82,12 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         return false;
     }
 
+    // Transform source axis from model-local to world coordinates so comparisons are consistent
+    if (!infoA.model.IsNull()) {
+        gp_Trsf transformA = infoA.model->LocalTransformation();
+        sourceAxis.Transform(transformA);
+    }
+
     // === 如果方向反向，翻转源轴 ===
 // （更新逻辑：普通件保持同向；若为“螺钉 + 螺孔”则希望最终反向）
     {
@@ -240,6 +246,23 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
     // === 更新约束关系 ===
     UpdateConstraints(infoA, partB, targetHoleType);
 
+    // 如果固定方是滑块且目标孔是 RodHole，并且移动方是 Rod 或 Screw，
+    // 则建立 MateConstraint（滑块 <- 棒/螺钉）并写入 PartGraph
+    if (targetHoleType == HoleType::RodHole) {
+        if (!m_graph) {
+            // nothing
+        } else {
+            if (infoB.type == PartType::Slider && (infoA.type == PartType::Rod || infoA.type == PartType::Screw)) {
+                MateConstraint mc;
+                mc.sliderName = partB; // fixed slider
+                mc.rodName = partA;    // moving rod/screw
+                mc.rodAxis = targetAxis; // targetAxis is already transformed to world
+                mc.holeIndex = holeIndexB;
+                m_graph->AddMate(mc);
+            }
+        }
+    }
+
     // === 输出装配信息 ===
     LogAssemblyInfo(partA, partB, holeIndexB, sourceAxis, targetAxis);
 
@@ -294,20 +317,21 @@ bool PartAssembler::FindSourceAxis(const PartInfo& partInfo, HoleType targetHole
 bool PartAssembler::ApplyTransformation(PartInfo& partInfo, const gp_Trsf& trsf)
 {
     try {
-        // 应用变换到模型
-        partInfo.model->SetLocalTransformation(trsf);
+        // Compose the incoming world->world transform with the current local transform
+        // New local transform Lnew should satisfy: world_new = trsf * world_old = trsf * Lold
+        gp_Trsf Lold = partInfo.model->LocalTransformation();
+        gp_Trsf Lnew = trsf; Lnew.Multiply(Lold); // Lnew = trsf * Lold
 
-        // 刷新显示
+        // Apply new local transform
+        partInfo.model->SetLocalTransformation(Lnew);
+
+        // Refresh display
         if (!m_context.IsNull()) {
             m_context->Redisplay(partInfo.model, Standard_True);
         }
 
-        // 更新所有孔轴到新位置（保持后续再次选择正确）
-        for (auto& hole : partInfo.holes) {
-            gp_Ax1 axis = hole.second;
-            axis.Transform(trsf);
-            hole.second = axis;
-        }
+        // IMPORTANT: Do not modify partInfo.holes here. holes are stored in model-local coordinates.
+        // Transforming them would convert them out of the "local" semantic and cause double transforms later.
 
         return true;
     }

@@ -10,6 +10,7 @@
 #include <TopoDS.hxx>
 #include <QHash> // ★ 新增: 显示名编号缓存
 #include <QString> // ★ 新增: 明确包含 QString 以避免构造访问问题
+#include <QFileInfo>
 #include <MainWindow_OSG.h>
 
 // ================= 匿名命名空间：稳定显示编号缓存 =================
@@ -62,14 +63,15 @@ AssemblyDialog::AssemblyDialog(
     m_tableB = new QTableWidget(this);
     m_tableC = new QTableWidget(this);
 
-    m_tableA->setColumnCount(2);
-    m_tableB->setColumnCount(2);
+    // 改为三列：显示名 | 文件名 | 类型
+    m_tableA->setColumnCount(3);
+    m_tableB->setColumnCount(3);
     m_tableC->setColumnCount(3);
 
     m_tableA->setHorizontalHeaderLabels(QStringList()
-        << QStringLiteral("名称") << QStringLiteral("类型"));
+        << QStringLiteral("显示名") << QStringLiteral("文件名") << QStringLiteral("类型"));
     m_tableB->setHorizontalHeaderLabels(QStringList()
-        << QStringLiteral("名称") << QStringLiteral("匹配件"));
+        << QStringLiteral("显示名") << QStringLiteral("文件名") << QStringLiteral("类型"));
     m_tableC->setHorizontalHeaderLabels(QStringList()
         << QStringLiteral("孔类型") << QStringLiteral("孔半径") << QStringLiteral("孔编号"));
 
@@ -119,50 +121,52 @@ void AssemblyDialog::populatePartATable()
     int row = 0;
     for (const auto& [name, info] : parts)
     {
-        // 只在“棒孔已用尽”时隐藏滑块
-        int totalRodHoles = 0, usedRodHoles = 0;
+        // 统计该零件的孔总数
+        int totalHoles = static_cast<int>(info.holes.size());
 
-        // 统计该零件的棒孔总数
-        for (auto& h : info.holes)
-            if (h.first == HoleType::RodHole) ++totalRodHoles;
-
-        // 统计该滑块已和多少根“棒”建立了 mate（每根棒占用一个孔）
-        // mates 里记录了 sliderName / rodName / holeIndex；rodName 的类型需确认为 Rod
-        if (info.type == PartType::Slider) {
-            const auto& mates = m_graph->GetMates();
-            for (const auto& m : mates) {
-                auto itRod = parts.find(m.rodName);
-                if (m.sliderName == name && itRod != parts.end()
-                    && itRod->second.type == PartType::Rod) {
-                    ++usedRodHoles;
-                }
-            }
+        // 统计该零件已经被占用的孔数（mates 中指向该零件为 slider 的条目）
+        int usedHoles = 0;
+        for (const auto& m : m_graph->GetMates()) {
+            if (m.sliderName == name) ++usedHoles;
         }
 
-        if (info.type == PartType::Slider && totalRodHoles > 0 && usedRodHoles >= totalRodHoles) continue;
+        // 如果声明了孔，则只有当仍有剩余孔时才显示；否则回退到原先的约束判定
+        bool include = true;
+        if (totalHoles > 0) {
+            include = (usedHoles < totalHoles);
+        } else {
+            include = info.constraint.targetPart.empty();
+        }
+
+        if (!include) continue;
 
         m_tableA->insertRow(row);
 
-        // ✅ 改动: 编号显示 + UserRole 保存真实名
+        // 显示友好名并保存真实名到 UserRole
         QString real = QString::fromUtf8(name.c_str()).trimmed();
-        QString shown = displayLabel(real, info.type); // “棒1”“滑块2”…
+        QString shown = displayLabel(real, info.type);
         auto* itemName = new QTableWidgetItem(shown);
-        itemName->setData(Qt::UserRole, real); // 真实名
+        itemName->setData(Qt::UserRole, real);
         m_tableA->setItem(row, 0, itemName);
 
-        // 类型转中文显示或英文都可以
-        QString typeStr;
-        switch (info.type)
-        {
-        case PartType::Rod:    typeStr = QStringLiteral("Rod");    break;
-        case PartType::Slider: typeStr = QStringLiteral("Slider"); break;
-        case PartType::Screw:  typeStr = QStringLiteral("Screw");  break;
+        // 文件名（显示 axis/json 的基名）
+        QString srcFile;
+        if (!info.model.IsNull()) {
+            try {
+                QString full = QString::fromUtf8(info.model->GetAxisFile().c_str());
+                QFileInfo fi(full);
+                srcFile = fi.fileName();
+            } catch(...) { srcFile = QString(); }
         }
+        m_tableA->setItem(row, 1, new QTableWidgetItem(srcFile));
 
-        m_tableA->setItem(row, 1, new QTableWidgetItem(typeStr));
+        // 类型显示（中文简短）
+        QString typeStr = (info.type == PartType::Rod) ? QStringLiteral("棒")
+                            : (info.type == PartType::Slider) ? QStringLiteral("滑块")
+                            : QStringLiteral("螺钉");
+        m_tableA->setItem(row, 2, new QTableWidgetItem(typeStr));
 
-        // ✅ 调试输出，验证每一行内容（显示名 + 真实名）
-        qDebug() << "[A表]" << shown << "(real=" << real << ")" << typeStr;
+        qDebug() << "[A表]" << shown << "(real=" << real << ")" << typeStr << "holes=" << totalHoles << "used=" << usedHoles;
 
         row++;
     }
@@ -176,8 +180,6 @@ void AssemblyDialog::onPartASelected(int row, int col)
 
     if (!m_tableA->item(row, 0)) return;
 
-    // ✅ 改动: 从 UserRole 取真实名
-    // QString qName = m_tableA->item(row, 0)->text().trimmed();
     QString qName = m_tableA->item(row, 0)->data(Qt::UserRole).toString();
     m_selectedA = qName.toUtf8().constData();
 
@@ -230,16 +232,20 @@ void AssemblyDialog::populatePartBTable(const std::string& partA)
         m_tableB->insertRow(row);
         QString real = QString::fromUtf8(name.c_str()).trimmed();
         QString shown = displayLabel(real, infoB.type);
-        QString typeStr = (infoB.type == PartType::Rod)
-            ? QStringLiteral("Rod")
-            : (infoB.type == PartType::Slider)
-            ? QStringLiteral("Slider")
-            : QStringLiteral("Screw");
+
+        // 文件名（axis/json 的基名）
+        QString srcFileB;
+        if (!infoB.model.IsNull()) {
+            try { QString full = QString::fromUtf8(infoB.model->GetAxisFile().c_str()); QFileInfo fi(full); srcFileB = fi.fileName(); } catch(...) { srcFileB = QString(); }
+        }
+
+        QString typeStr = (infoB.type == PartType::Rod) ? QStringLiteral("棒") : (infoB.type == PartType::Slider) ? QStringLiteral("滑块") : QStringLiteral("螺钉");
 
         auto* it0 = new QTableWidgetItem(shown); // 0列显示编号后名字
         it0->setData(Qt::UserRole, real);        // UserRole 存真实名
         m_tableB->setItem(row, 0, it0);
-        m_tableB->setItem(row, 1, new QTableWidgetItem(typeStr));
+        m_tableB->setItem(row, 1, new QTableWidgetItem(srcFileB));
+        m_tableB->setItem(row, 2, new QTableWidgetItem(typeStr));
 
         qDebug() << "[B表] 添加匹配项:" << shown << "(real=" << real << ")" << typeStr;
         row++;
@@ -254,8 +260,6 @@ void AssemblyDialog::onPartBSelected(int row, int col)
 
     if (!m_tableB->item(row, 0)) return;
 
-    // ✅ 改动: 从 UserRole 取真实名
-    // QString qName = m_tableB->item(row, 0)->text().trimmed();
     QString qName = m_tableB->item(row, 0)->data(Qt::UserRole).toString();
     m_selectedB = qName.toUtf8().constData();
 
@@ -350,7 +354,7 @@ void AssemblyDialog::onHoleSelected(int row, int col)
     qDebug() << "[C表] 点击孔行:" << row << "滑块名称(来自B/A逻辑):" << QString::fromStdString(m_sliderName);
     
     // 找出滑块信息
-	const auto& parts = m_graph->GetParts();
+    const auto& parts = m_graph->GetParts();
     auto it = parts.find(m_sliderName);
 
     if (it == parts.end()) {
@@ -376,7 +380,6 @@ void AssemblyDialog::onHoleSelected(int row, int col)
 
     // === 用世界轴线去找孔 ===
     highlightHoleFace(partInfo.model, worldAxis, radius);
-
 }
 
 // ---------------- 完成按钮 ----------------
@@ -411,9 +414,7 @@ void AssemblyDialog::onFinishClicked()
 
     ConstraintManager mgr(m_graph, m_context);
 
-    // ------------------------------------------------------------
-    // 1. 特例：螺钉 → 滑块（B 为螺钉，A 为滑块）
-    // ------------------------------------------------------------
+    // 特殊装配逻辑...
     if (Fixed.type == PartType::Slider && Moving.type == PartType::Screw)
     {
         auto res = mgr.AssembleScrewToSlider(movingPart, fixedPart, m_selectedHoleIndex);
@@ -426,9 +427,6 @@ void AssemblyDialog::onFinishClicked()
         return;
     }
 
-    // ------------------------------------------------------------
-    // 2. 滑块 → 棒（B 为滑块，A 为棒）
-    // ------------------------------------------------------------
     if (Fixed.type == PartType::Rod && Moving.type == PartType::Slider)
     {
         auto res = mgr.AssembleSliderToRod(movingPart, fixedPart, m_selectedHoleIndex);
@@ -441,46 +439,27 @@ void AssemblyDialog::onFinishClicked()
         return;
     }
 
-    // ------------------------------------------------------------
-    // 3. 棒 → 滑块（B 为棒，A 为滑块）
-    // ------------------------------------------------------------
     if (Fixed.type == PartType::Slider && Moving.type == PartType::Rod)
     {
         PartAssembler assembler(m_graph, m_context);
-
-        bool ok = assembler.AssembleParts(
-            movingPart,     // B 移动
-            fixedPart,      // A 固定
-            m_selectedHoleIndex
-        );
-
+        bool ok = assembler.AssembleParts(movingPart, fixedPart, m_selectedHoleIndex);
         if (!ok) {
             QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("棒 → 滑块 装配失败"));
             return;
         }
-
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("棒 → 滑块 装配成功"));
         resetUI();
         return;
     }
 
-    // ------------------------------------------------------------
-    // 4. 其他普通装配
-    // ------------------------------------------------------------
     {
         PartAssembler assembler(m_graph, m_context);
-        bool success = assembler.AssembleParts(
-            movingPart,   // B 移动
-            fixedPart,    // A 固定
-            m_selectedHoleIndex
-        );
-
+        bool success = assembler.AssembleParts(movingPart, fixedPart, m_selectedHoleIndex);
         if (!success) {
             QMessageBox::critical(this, QStringLiteral("装配"),
                 QStringLiteral("普通装配失败，请检查选择。"));
             return;
         }
-
         QMessageBox::information(this, QStringLiteral("装配"),
             QStringLiteral("普通装配完成（无约束）。"));
     }
@@ -488,8 +467,6 @@ void AssemblyDialog::onFinishClicked()
     resetUI();
 }
 
-
-// ---------------- 工具函数 ----------------
 void AssemblyDialog::clearHighlight()
 {
     if (m_context.IsNull() || m_view.IsNull()) return;
@@ -530,7 +507,7 @@ void AssemblyDialog::highlightPart(const Handle(AIS_ModelWithAxis)& model)
         //m_view->Redraw();
     }
     catch (...) {
-        qWarning() << "[AssemblyDialog] highlightPart() failed due to OpenGL context issue";
+        qWarning() << "[highlightPart] highlightPart() failed due to OpenGL context issue";
     }
 }
 

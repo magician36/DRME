@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <gp_Ax1.hxx>
+#include <gp_Trsf.hxx>
 #include <json.hpp>
 
 class AIS_ModelWithAxis;
@@ -86,6 +87,12 @@ public:
 
     // 新增：可变访问（允许外部在装配后更新 PartInfo）
     std::map<std::string, PartInfo>& GetMutableParts() { return parts; }
+
+    // 查找由 model 对象对应的零件名称（若无匹配返回空字符串）
+    std::string FindPartByModel(const Handle(AIS_ModelWithAxis)& model) const;
+
+    // 更新零件的本地变换（写回内存），用于操纵器结束时持久化
+    void UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf);
 
     // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
     // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）

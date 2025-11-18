@@ -46,6 +46,9 @@ public:
         return gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1));
     }
 
+    // 返回用于加载轴线的源 JSON 文件路径（用于 UI 显示）
+    std::string GetAxisFile() const { return m_axisFile; }
+
 protected:
     // 覆写绘制：先调用父类绘制模型，再叠加轴线
     void Compute(

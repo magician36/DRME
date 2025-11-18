@@ -431,6 +431,20 @@ void OCCTWidget::mouseReleaseEvent(QMouseEvent* event)
 			aManipulator->StopTransform(Standard_True);
 			qDebug() << "[StopTransform] HasActive=" << aManipulator->HasActiveMode();   // 👈 插在这里
 			m_usingManipulator = false;
+
+            // === 新增：把当前场景中所有模型的 local transform 写回 PartGraph，保持内存一致 ===
+            if (m_partGraph) {
+                auto& parts = m_partGraph->GetMutableParts();
+                for (auto& kv : parts) {
+                    PartInfo& info = kv.second;
+                    if (info.model.IsNull()) continue;
+                    gp_Trsf L = info.model->LocalTransformation();
+                    // 将变换写回 PartGraph（也会设置到模型上，保证一致）
+                    m_partGraph->UpdatePartTransform(kv.first, L);
+                }
+                qDebug() << "[StopTransform] PartGraph transforms updated.";
+            }
+
 			m_3dView->Redraw();
 		}
 		else

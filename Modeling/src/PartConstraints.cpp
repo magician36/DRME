@@ -99,14 +99,21 @@ CreateConstraintResult ConstraintManager::AssembleSliderToRod(const std::string&
     gp_Trsf trsf;
     trsf.SetDisplacement(frameSource, frameTarget);
 
-    // 应用到滑块：覆盖本地变换为 trsf
+    // 应用到滑块：合成到当前本地变换并写回 PartGraph
     try {
-        // 更新显示变换（trsf 是 world->world，设为 LocalTransformation 直接把 slider 放置到目标）
-        slider.model->SetLocalTransformation(trsf);
-        if (!m_context.IsNull()) m_context->Redisplay(slider.model, Standard_True);
+        // 获取可写的 PartInfo
+        auto& partsNonConst = m_graph->GetMutableParts();
+        auto itSliderNon = partsNonConst.find(sliderName);
+        if (itSliderNon == partsNonConst.end()) { r.message = "internal error"; return r; }
+
+        PartInfo& sliderInfo = itSliderNon->second;
+
+        PartAssembler assembler(m_graph, m_context);
+        if (!assembler.ApplyTransformation(sliderInfo, trsf)) {
+            r.message = "transform apply failed"; return r;
+        }
 
         // 注意：不修改 PartGraph 中存储的 holes（它们应始终为局部坐标）。
-        // 之前修改 holes 会导致语义混乱和重复变换问题。
     }
     catch (...) {
         r.message = "transform apply failed"; return r;

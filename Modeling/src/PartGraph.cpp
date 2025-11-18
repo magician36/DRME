@@ -200,7 +200,7 @@ void PartGraph::AddConstraint(const std::string& partName, const std::string& ta
         << " (" << (type == HoleType::RodHole ? "RodHole" : "ScrewHole") << ")\n";
 }
 
-// === 添加装配约束（滑块→棒） ===
+// === 添加装配约束（滑块→棒）===
 void PartGraph::AddMate(const MateConstraint& mate)
 {
     mates.push_back(mate);
@@ -327,4 +327,24 @@ std::vector<std::string> PartGraph::GetScrewsForSlider(const std::string& slider
         }
     }
     return out;
+}
+
+// === 新增实现：查找 model 对应的零件名称 ===
+std::string PartGraph::FindPartByModel(const Handle(AIS_ModelWithAxis)& model) const
+{
+    if (model.IsNull()) return std::string();
+    for (const auto& kv : parts) {
+        if (!kv.second.model.IsNull() && kv.second.model == model) return kv.first;
+    }
+    return std::string();
+}
+
+// === 新增实现：更新零件本地变换（写回）===
+void PartGraph::UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf)
+{
+    auto it = parts.find(partName);
+    if (it == parts.end()) return;
+    if (it->second.model.IsNull()) return;
+    // 将变换设置到模型上（PartInfo.holes 保持为局部坐标）
+    it->second.model->SetLocalTransformation(localTrsf);
 }
