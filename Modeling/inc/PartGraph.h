@@ -3,8 +3,8 @@
 #include <vector>
 #include <map>
 #include <gp_Ax1.hxx>
+#include <gp_Trsf.hxx>
 #include <json.hpp>
-#include <AIS_InteractiveContext.hxx>
 
 class AIS_ModelWithAxis;
 class PartAssembler;  // 前向声明
@@ -85,15 +85,20 @@ public:
     // 只读访问函数
     const std::map<std::string, PartInfo>& GetParts() const { return parts; }
 
-    // === 新增：查询"滑块绑定的棒轴 & 螺钉列表" ===
-    // 获取该滑块对应的"棒"装配（若有），用于得到棒轴（世界）
+    // 新增：可变访问（允许外部在装配后更新 PartInfo）
+    std::map<std::string, PartInfo>& GetMutableParts() { return parts; }
+
+    // 查找由 model 对象对应的零件名称（若无匹配返回空字符串）
+    std::string FindPartByModel(const Handle(AIS_ModelWithAxis)& model) const;
+
+    // 更新零件的本地变换（写回内存），用于操纵器结束时持久化
+    void UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf);
+
+    // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
+    // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）
     const MateConstraint* FindRodMateForSlider(const std::string& sliderName) const;
-    // 获取与该滑块装配的"螺钉"名称列表（用作刚体联动）
+    // 获取与该滑块装配的“螺钉”名称列表（用作刚体联动）
     std::vector<std::string> GetScrewsForSlider(const std::string& sliderName) const;
-    
-    // === 复制滑块（保留位姿 + Rod 约束） ===
-    std::string DuplicateSliderWithRodMates(const std::string& sliderName,
-        const Handle(AIS_InteractiveContext)& context);
     
     // 允许 PartAssembler 访问私有成员
     friend class PartAssembler;

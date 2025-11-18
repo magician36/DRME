@@ -27,6 +27,7 @@ namespace {
 }
 
 
+
 // === 自动推断不同零件类型的自由度 ===
 DOFInfo PartGraph::InferDOF(PartType type)
 {
@@ -199,7 +200,7 @@ void PartGraph::AddConstraint(const std::string& partName, const std::string& ta
         << " (" << (type == HoleType::RodHole ? "RodHole" : "ScrewHole") << ")\n";
 }
 
-// === 添加装配约束（滑块→棒） ===
+// === 添加装配约束（滑块→棒）===
 void PartGraph::AddMate(const MateConstraint& mate)
 {
     mates.push_back(mate);
@@ -321,77 +322,29 @@ std::vector<std::string> PartGraph::GetScrewsForSlider(const std::string& slider
         if (m.sliderName == sliderName) {
             auto it = parts.find(m.rodName);
             if (it != parts.end() && it->second.type == PartType::Screw) {
-                out.push_back(m.rodName); // 这里 rodName 复用为"被约束件"（螺钉名）
+                out.push_back(m.rodName); // 这里 rodName 复用为“被约束件”（螺钉名）
             }
         }
     }
     return out;
 }
 
-// === 复制滑块（保留位姿 + Rod 约束 + 轴线/孔信息） ===
-std::string PartGraph::DuplicateSliderWithRodMates(
-    const std::string& sliderName,
-    const Handle(AIS_InteractiveContext)& context)
+// === 新增实现：查找 model 对应的零件名称 ===
+std::string PartGraph::FindPartByModel(const Handle(AIS_ModelWithAxis)& model) const
 {
-    // 1) 找到原滑块
-    auto it = parts.find(sliderName);
-    if (it == parts.end()) {
-        qWarning() << "[DuplicateSlider] slider not found:" << QString::fromStdString(sliderName);
-        return {};
+    if (model.IsNull()) return std::string();
+    for (const auto& kv : parts) {
+        if (!kv.second.model.IsNull() && kv.second.model == model) return kv.first;
     }
-    const PartInfo& src = it->second;
-    if (src.type != PartType::Slider) {
-        qWarning() << "[DuplicateSlider] not a slider:" << QString::fromStdString(sliderName);
-        return {};
-    }
-    if (src.model.IsNull()) {
-        qWarning() << "[DuplicateSlider] model null";
-        return {};
-    }
+    return std::string();
+}
 
-    // 2) 生成一个新的名字（在原名后自动加数字）
-    std::string newName = makeUniqueName(parts, sliderName);
-
-    // 3) 复制 AIS_ModelWithAxis：形状 + 轴线/孔信息 + 位姿
-    Handle(AIS_ModelWithAxis) newModel = new AIS_ModelWithAxis(src.model->Shape(), "");
-    // ★ 关键：克隆轴线/孔类型，而不是重新识别
-    newModel->CloneAxisDataFrom(src.model);
-    // 保持原来的位姿
-    newModel->SetLocalTransformation(src.model->LocalTransformation());
-
-    // 4) 用 AddPart 注册一个"新滑块"到 PartGraph
-    double mainRadius = src.mainRadius;
-    AddPart(newName, PartType::Slider, newModel, mainRadius);
-
-    // 5) 在视图中显示新滑块
-    if (!context.IsNull() && !newModel.IsNull()) {
-        context->Display(newModel, Standard_False);
-    }
-
-    // 6) 复制与该滑块相关的 Mate（棒约束 + 逻辑约束）
-    //    注意：先收集，再统一 AddMate，避免遍历时改动 mates
-    std::vector<MateConstraint> toAdd;
-    for (const auto& m : mates) {
-        if (m.sliderName == sliderName) {
-            auto itRod = parts.find(m.rodName);
-            if (itRod != parts.end() && itRod->second.type == PartType::Rod) {
-                MateConstraint nm = m;
-                nm.sliderName = newName;   // 改成新滑块名
-                // rodName / rodAxis / holeIndex 原封不动
-                toAdd.push_back(nm);
-            }
-        }
-    }
-
-    for (const auto& nm : toAdd) {
-        AddMate(nm);
-        AddConstraint(newName, nm.rodName, HoleType::RodHole);
-    }
-
-    qDebug().noquote()
-        << QString("[DuplicateSlider] %1 -> %2 (with rod mates)")
-           .arg(QString::fromStdString(sliderName))
-           .arg(QString::fromStdString(newName));
-
-    return newName;
+// === 新增实现：更新零件本地变换（写回）===
+void PartGraph::UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf)
+{
+    auto it = parts.find(partName);
+    if (it == parts.end()) return;
+    if (it->second.model.IsNull()) return;
+    // 将变换设置到模型上（PartInfo.holes 保持为局部坐标）
+    it->second.model->SetLocalTransformation(localTrsf);
 }

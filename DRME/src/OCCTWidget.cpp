@@ -168,15 +168,12 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 
 		if (t_pick_status == AIS_SOP_OneSelected)
 		{
-			// 获取被选中的 AIS_ModelWithAxis
-			Handle(AIS_ModelWithAxis) selectedModel;
 			// 初始化选中对象
 			m_InteractiveContext->InitSelected();
 			if (m_InteractiveContext->MoreSelected())
 			{
 				Handle(AIS_InteractiveObject) selectedObj = m_InteractiveContext->SelectedInteractive();
 				ais_shape = dynamic_cast<AIS_ColoredShape*>(selectedObj.get());
-				selectedModel = Handle(AIS_ModelWithAxis)::DownCast(selectedObj);
 			}
 
 			// === 菜单项：操纵 / 取消操纵 ===
@@ -326,50 +323,6 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 					qDebug() << "[右键] 打开装配对话框";
 			});
 
-			// === 新增：复制滑块（保留装配到棒） ===
-			if (!selectedModel.IsNull() && m_partGraph)
-			{
-				// 通过 model 反查零件名和类型
-				std::string partName;
-				PartType pType = PartType::Rod;
-				const auto& parts = m_partGraph->GetParts();
-				for (const auto& kv : parts) {
-					if (!kv.second.model.IsNull() && kv.second.model == selectedModel) {
-						partName = kv.first;
-						pType = kv.second.type;
-						break;
-					}
-				}
-
-				// 只对滑块显示此菜单项
-				if (!partName.empty() && pType == PartType::Slider) {
-					QAction* actDupSlider = new QAction(QStringLiteral("复制滑块（保留装配）"), menu);
-					menu->addAction(actDupSlider);
-
-					connect(actDupSlider, &QAction::triggered, this, [=]()
-					{
-						// 调用 PartGraph 的复制接口
-						std::string newName = m_partGraph->DuplicateSliderWithRodMates(
-							partName, m_InteractiveContext);
-
-						if (newName.empty()) {
-							qWarning() << "[DuplicateSlider] duplicate failed";
-							QMessageBox::warning(this, QStringLiteral("复制失败"), 
-								QStringLiteral("复制滑块失败，请检查日志"));
-						} else {
-							qDebug() << "[DuplicateSlider] Success:" 
-								<< QString::fromStdString(partName) << "->" 
-								<< QString::fromStdString(newName);
-							
-							// 刷新显示
-							if (!m_3dView.IsNull()) {
-								m_3dView->Redraw();
-							}
-						}
-					});
-				}
-			}
-
             // ===== 新增：直接在 3D 窗口右键修改选中零件颜色与透明度（保留原树功能，不修改原代码） =====
             if (ais_shape) {
                 QAction* actColor = new QAction(QStringLiteral("更改颜色"), menu);
@@ -478,6 +431,20 @@ void OCCTWidget::mouseReleaseEvent(QMouseEvent* event)
 			aManipulator->StopTransform(Standard_True);
 			qDebug() << "[StopTransform] HasActive=" << aManipulator->HasActiveMode();   // 👈 插在这里
 			m_usingManipulator = false;
+
+            // === 新增：把当前场景中所有模型的 local transform 写回 PartGraph，保持内存一致 ===
+            if (m_partGraph) {
+                auto& parts = m_partGraph->GetMutableParts();
+                for (auto& kv : parts) {
+                    PartInfo& info = kv.second;
+                    if (info.model.IsNull()) continue;
+                    gp_Trsf L = info.model->LocalTransformation();
+                    // 将变换写回 PartGraph（也会设置到模型上，保证一致）
+                    m_partGraph->UpdatePartTransform(kv.first, L);
+                }
+                qDebug() << "[StopTransform] PartGraph transforms updated.";
+            }
+
 			m_3dView->Redraw();
 		}
 		else
@@ -582,7 +549,7 @@ void OCCTWidget::dropEvent(QDropEvent* event)
 	OCCModeling::LoadModelToWidget(filePath, this, m_mainWindow->featureTreeWidget, *this->getPartGraph());
 
 }
-// 平smooth缩放核心函数
+// 平滑缩放核心函数
 void OCCTWidget::zoomViewByWheel(QWheelEvent* event)
 {
 	int delta = event->angleDelta().y();
@@ -687,44 +654,43 @@ void OCCTWidget::ApplyDOFProjectionForActive()
     gp_Trsf Lnow = m_attachedModel->LocalTransformation();
     gp_Trsf dL = m_prevL; dL.Invert(); dL.Multiply(Lnow);
 
-    // ===== 滑块：允许沿轴平移 + 绕轴旋转，并把螺钉同步 =====
-    // 新增：当与该滑块关联的棒 Mate 数 >=2 时，仅允许轴向平移（禁旋）
-    if (selfType == PartType::Slider) {
-        int rodMateCount = 0; gp_Dir u(0,0,1); gp_Pnt axisOrigin;
-        for (const auto& m : m_partGraph->GetMates()) {
-            auto itRod = parts.find(m.rodName);
-            if (m.sliderName == selfName && itRod != parts.end() && itRod->second.type == PartType::Rod) {
-                if (rodMateCount == 0) { u = m.rodAxis.Direction(); axisOrigin = m.rodAxis.Location(); }
-                ++rodMateCount;
-            }
-        }
-        if (rodMateCount == 0) { m_prevL = Lnow; return; }
+	// 新增：当与该滑块关联的棒 Mate 数 >=2 时，仅允许轴向平移（禁旋）
+	if (selfType == PartType::Slider) {
+		int rodMateCount = 0; gp_Dir u(0, 0, 1); gp_Pnt axisOrigin;
+		for (const auto& m : m_partGraph->GetMates()) {
+			auto itRod = parts.find(m.rodName);
+			if (m.sliderName == selfName && itRod != parts.end() && itRod->second.type == PartType::Rod) {
+				if (rodMateCount == 0) { u = m.rodAxis.Direction(); axisOrigin = m.rodAxis.Location(); }
+				++rodMateCount;
+			}
+		}
+		if (rodMateCount == 0) { m_prevL = Lnow; return; }
 
-        // 投影平移到轴向
-        gp_Vec t = dL.TranslationPart();
-        Standard_Real s = t.Dot(u.XYZ());
-        gp_Vec tProj = gp_Vec(u.XYZ()) * s;
+		// 投影平移到轴向
+		gp_Vec t = dL.TranslationPart();
+		Standard_Real s = t.Dot(u.XYZ());
+		gp_Vec tProj = gp_Vec(u.XYZ()) * s;
 
-        gp_Trsf dAllowed; dAllowed.SetTranslationPart(tProj);
+		gp_Trsf dAllowed; dAllowed.SetTranslationPart(tProj);
 
-        if (rodMateCount < 2) {
-            // 单棒：保留原绕轴旋转约束（投影旋转到允许轴）
-            gp_Mat R = dL.VectorialPart();
-            gp_Quaternion qR; qR.SetMatrix(R);
-            Standard_Real vx = qR.X(), vy = qR.Y(), vz = qR.Z(), w = qR.W();
-            Standard_Real normv = sqrt(vx*vx + vy*vy + vz*vz);
-            Standard_Real angAllowed = 0.0;
-            if (normv > 1e-12) {
-                gp_Dir axisQ(gp_Vec(vx, vy, vz));
-                Standard_Real ang = 2.0 * atan2(normv, w);
-                Standard_Real k = axisQ.Dot(u); // 同向正，反向负
-                angAllowed = ang * k;
-            }
-            if (Abs(angAllowed) > 1e-12) {
-                gp_Trsf dRot; dRot.SetRotation(gp_Ax1(axisOrigin, u), angAllowed);
-                dAllowed.Multiply(dRot);
-            }
-        } // rodMateCount >=2 时不合成旋转
+		if (rodMateCount < 2) {
+			// 单棒：保留原绕轴旋转约束（投影旋转到允许轴）
+			gp_Mat R = dL.VectorialPart();
+			gp_Quaternion qR; qR.SetMatrix(R);
+			Standard_Real vx = qR.X(), vy = qR.Y(), vz = qR.Z(), w = qR.W();
+			Standard_Real normv = sqrt(vx * vx + vy * vy + vz * vz);
+			Standard_Real angAllowed = 0.0;
+			if (normv > 1e-12) {
+				gp_Dir axisQ(gp_Vec(vx, vy, vz));
+				Standard_Real ang = 2.0 * atan2(normv, w);
+				Standard_Real k = axisQ.Dot(u); // 同向正，反向负
+				angAllowed = ang * k;
+			}
+			if (Abs(angAllowed) > 1e-12) {
+				gp_Trsf dRot; dRot.SetRotation(gp_Ax1(axisOrigin, u), angAllowed);
+				dAllowed.Multiply(dRot);
+			}
+		} // rodMateCount >=2 时不合成旋转
 
         // 应用到滑块
         gp_Trsf Lfix = m_prevL; Lfix.Multiply(dAllowed);
@@ -732,7 +698,7 @@ void OCCTWidget::ApplyDOFProjectionForActive()
         if (!m_InteractiveContext.IsNull())
             m_InteractiveContext->Redisplay(m_attachedModel, Standard_False);
 
-        // 同步螺钉
+        // 同步所有与该滑块装配的螺钉（同刚体增量）
         const auto screwNames = m_partGraph->GetScrewsForSlider(selfName);
         for (const auto& scName : screwNames) {
             auto it = parts.find(scName);
