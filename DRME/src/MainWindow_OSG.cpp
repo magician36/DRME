@@ -6,6 +6,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QStringLiteral>
+#include <QString> // 新增: 直接使用 QString 接口
 #include <AIS_ColoredShape.hxx>
 #include <Standard_Type.hxx>
 #include <QVariant>
@@ -19,20 +20,64 @@
 #include <Prs3d_Drawer.hxx>
 #include <Graphic3d_NameOfMaterial.hxx>
 #include "PartLibraryDock.h"
+#include <BRepBuilderAPI_Transform.hxx>
+#include <fstream>
+#include "IModelLoader.h"
+#include <TopAbs_ShapeEnum.hxx>
+#include <QFileInfo> // 新增: 用于判断扩展名
 
-Ui_MainWindow::Ui_MainWindow()
+// ========== 匿名命名空间：JsonModelLoader 实现 ==========
+namespace {
+class JsonModelLoader : public IModelLoader {
+public:
+    JsonModelLoader(OCCTWidget* w, QTreeWidget* tree) : m_widget(w), m_tree(tree) {}
+    Handle(AIS_ModelWithAxis) Create(const std::string& name, PartType type, double mainRadius, const std::string& sourcePath) override {
+        if (!m_widget || sourcePath.empty()) return Handle(AIS_ModelWithAxis)();
+        TopoDS_Shape shape = ImportShape(sourcePath);
+        if (shape.IsNull()) {
+            qWarning() << "[JsonModelLoader] ImportShape 失败:" << QString::fromStdString(sourcePath);
+            return Handle(AIS_ModelWithAxis)();
+        }
+        std::string axisFile = sourcePath + "_axes.json";
+        Handle(AIS_ModelWithAxis) model = new AIS_ModelWithAxis(shape, axisFile);
+        m_widget->m_models.push_back(model);
+        if (m_widget->aManipulator.IsNull()) m_widget->aManipulator = new AIS_Manipulator();
+        m_widget->aManipulator->Attach(model);
+        auto ctx = m_widget->getInteractiveContext();
+        if (!ctx.IsNull()) {
+            ctx->Display(model, Standard_False);
+            ctx->Activate(AIS_Shape::SelectionMode(TopAbs_SOLID), Standard_True);
+        }
+        m_widget->ais_shape = model.get();
+        m_widget->aViewShape = shape;
+        if (m_tree) {
+            QTreeWidgetItem* root = m_tree->topLevelItem(0);
+            if (!root) {
+                root = new QTreeWidgetItem(m_tree);
+                root->setText(0, QStringLiteral("模型"));
+            }
+            QTreeWidgetItem* item = new QTreeWidgetItem(root);
+            item->setText(0, QString::fromStdString(name));
+            item->setText(1, QStringLiteral("已加载"));
+            item->setData(0, Qt::UserRole, QVariant::fromValue((void*)model.get()));
+            root->addChild(item);
+        }
+        return model;
+    }
+private:
+    OCCTWidget* m_widget = nullptr;
+    QTreeWidget* m_tree = nullptr;
+};
+} // namespace
+
+Ui_MainWindow::Ui_MainWindow() { }
+
+// 自定义模型加载器(FileModelLoader) 已移除，使用 JsonModelLoader
+
+void Ui_MainWindow::show(QMainWindow* Form) { Form->show(); }
+
+void Ui_MainWindow::ViewCascade()
 {
- 
-}
-
-
- void Ui_MainWindow::show(QMainWindow* Form)
- {
- 	 Form->show();
- }
-
- void Ui_MainWindow::ViewCascade()
- {
  	 OCCSubWindow* pOCCWindow = (OCCSubWindow*)mdiArea->currentSubWindow();
 
  	 if (pOCCWindow != nullptr)
@@ -187,7 +232,7 @@ Ui_MainWindow::Ui_MainWindow()
  	 pOCCWidget->ais_shape = new AIS_ColoredShape(compoundMaker);
 
  	 pOCCWidget->aViewShape = compoundMaker;
- 	 //
+	 //
 
  	 pOCCWidget->getInteractiveContext()->Display(pOCCWidget->ais_shape, true);
 	 // 统一应用显示属性
@@ -198,6 +243,7 @@ Ui_MainWindow::Ui_MainWindow()
  	 pOCCWidget->get3dView()->MustBeResized();
 
  	 OutputColorShape("E:\\OCC.stp", compoundMaker);
+
 
  }
 
@@ -221,7 +267,6 @@ Ui_MainWindow::Ui_MainWindow()
  		 subWindow = AddSubWindow();
  		 pOCCWidget = new OCCTWidget(subWindow);
          pOCCWidget->setMainWindow(this);
- 		 pOCCWidget->setPartGraph(&partGraph);
  		 subWindow->setWidget(pOCCWidget);
  		 subWindow->bInitialize = true;
  		 subWindow->show();
@@ -245,16 +290,20 @@ Ui_MainWindow::Ui_MainWindow()
  		 for (QMdiSubWindow* win : subWindows) {
  			 if (win->windowTitle() == selectedWin) {
  				 targetWin = win;
- 				 
  			 }
  		 }
  		 if (!targetWin) return;
  		 pOCCWidget = (OCCTWidget*)targetWin->widget();
  	 }
 
- 	 // ===  PartGraph 绑定 ===
- 	 pOCCWidget->setPartGraph(&partGraph);
+    QString suffix = QFileInfo(filename).suffix().toLower();
+    if (suffix == QStringLiteral("stl")) {
+        pOCCWidget->loadStlFile(filename);
+        return; // 不走装配逻辑
+    }
 
+ 	 // === 原来的装配逻辑：仅用于 STEP/STP ===
+ 	 pOCCWidget->setPartGraph(&partGraph);
      OCCModeling::LoadModelToWidget(filename, pOCCWidget, featureTreeWidget, partGraph);
  	 
  }
@@ -293,7 +342,7 @@ Ui_MainWindow::Ui_MainWindow()
 
  		 pOCCWidget->ais_shape = new AIS_ColoredShape(aMeshShape);
  		 pOCCWidget->aViewShape = aMeshShape;
-		 
+	 
 
  		 pOCCWidget->getInteractiveContext()->Display(pOCCWidget->ais_shape, true);
  		 ApplyDisplayAttributes(pOCCWidget->getInteractiveContext(), Handle(AIS_InteractiveObject)(pOCCWidget->ais_shape), Standard_False);
@@ -321,30 +370,30 @@ Ui_MainWindow::Ui_MainWindow()
  void Ui_MainWindow::Init(QMainWindow* MainWindow)
  {
  	 MainWindow->setCentralWidget(mdiArea);
- 	 mdiArea->setViewMode(QMdiArea::TabbedView);
- 	 mdiArea->setTabsMovable(true);
- 	 mdiArea->setTabsClosable(true);
+ mdiArea->setViewMode(QMdiArea::TabbedView);
+ mdiArea->setTabsMovable(true);
+ mdiArea->setTabsClosable(true);
 
- 	 MainWindow->resize(1200, 800);
+ MainWindow->resize(1200, 800);
 
- 	 //特征控件
- 	 FeatureItems = new QDockWidget(QStringLiteral("建模树"), MainWindow);
- 	 QWidget* FeatureFunctionPanel = new QWidget();
- 	 FeatureFunctionPanel->setFixedWidth(240);
+ //特征控件
+ FeatureItems = new QDockWidget(QStringLiteral("建模树"), MainWindow);
+ QWidget* FeatureFunctionPanel = new QWidget();
+ FeatureFunctionPanel->setFixedWidth(240);
 
- 	 QVBoxLayout* FeatureWidgetLayout = new QVBoxLayout();
- 	 //特征树控件
- 	 featureTreeWidget = new QTreeWidget();
- 	 featureTreeWidget->setColumnCount(2);
- 	 QStringList Labels = { QStringLiteral("类型"),QStringLiteral("状态") };
- 	 featureTreeWidget->setHeaderLabels(Labels);
- 	 featureTreeWidget->setColumnWidth(0, 140);
- 	 featureTreeWidget->setColumnWidth(1, 80);
- 	 featureTreeWidget->setSelectionMode(QTreeWidget::ExtendedSelection);
+ QVBoxLayout* FeatureWidgetLayout = new QVBoxLayout();
+ //特征树控件
+ featureTreeWidget = new QTreeWidget();
+ featureTreeWidget->setColumnCount(2);
+ QStringList Labels = { QStringLiteral("类型"),QStringLiteral("状态") };
+ featureTreeWidget->setHeaderLabels(Labels);
+ featureTreeWidget->setColumnWidth(0, 140);
+ featureTreeWidget->setColumnWidth(1, 80);
+ featureTreeWidget->setSelectionMode(QTreeWidget::ExtendedSelection);
 
- 	 // 右键菜单支持
- 	 featureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
- 	 QObject::connect(featureTreeWidget, &QTreeWidget::customContextMenuRequested, [this](const QPoint& pos) {
+ // 右键菜单支持
+ featureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+ QObject::connect(featureTreeWidget, &QTreeWidget::customContextMenuRequested, [this](const QPoint& pos) {
  		 QTreeWidgetItem* item = featureTreeWidget->itemAt(pos);
  		 if (!item) return;
  		 QTreeWidgetItem* root = featureTreeWidget->topLevelItem(0);
@@ -461,6 +510,7 @@ Ui_MainWindow::Ui_MainWindow()
 
  	 QTreeWidgetItem* Root = new QTreeWidgetItem(featureTreeWidget);
  	 Root->setText(0, QStringLiteral("模型"));
+
 
 
 
@@ -625,8 +675,8 @@ Ui_MainWindow::Ui_MainWindow()
  					 occW->aViewShape = a.replace.oldShape->Shape();
  			 }
  			 ctx->UpdateCurrentViewer();
- 		     view->FitAll();
- 		     view->MustBeResized();
+ 		    view->FitAll();
+ 		    view->MustBeResized();
  		 }
  	 }
 
@@ -723,19 +773,19 @@ Ui_MainWindow::Ui_MainWindow()
 
  	 // 原：TopoDS_Shape newShape = ImportStp(std::string(stepFile.toLocal8Bit().constData()));
  	 // 改为使用 std::string 扩展名解析
-     std::string stepStd(stepFile.toLocal8Bit().constData());
-     std::string ext2;
-     size_t dotPos2 = stepStd.find_last_of('.');
-     if (dotPos2 != std::string::npos) {
-         ext2 = stepStd.substr(dotPos2 + 1);
-         std::transform(ext2.begin(), ext2.end(), ext2.begin(), [](unsigned char c){ return std::tolower(c); });
-     }
-     TopoDS_Shape newShape;
-     if (ext2 == "stl") {
-         newShape = ImportStl(stepStd.c_str());
-     } else {
-         newShape = ImportStp(stepStd);
-     }
+    std::string stepStd(stepFile.toLocal8Bit().constData());
+    std::string ext2;
+    size_t dotPos2 = stepStd.find_last_of('.');
+    if (dotPos2 != std::string::npos) {
+        ext2 = stepStd.substr(dotPos2 + 1);
+        std::transform(ext2.begin(), ext2.end(), ext2.begin(), [](unsigned char c){ return std::tolower(c); });
+    }
+    TopoDS_Shape newShape;
+    if (ext2 == "stl") {
+        newShape = ImportStl(stepStd.c_str());
+    } else {
+        newShape = ImportStp(stepStd);
+    }
  	 if (newShape.IsNull()) return;  // 读取失败
 
  	 QMdiSubWindow* subWin = mdiArea->currentSubWindow();
@@ -841,8 +891,9 @@ Ui_MainWindow::Ui_MainWindow()
  // ================= Save model (selected or all) =================
  // 保存模型：
  // 1. 若选中项存在且其父为根，保存选中项；否则保存根下所有一级子节点
- // 2. 将多个 shape 合并为一个 Compound（如果多于 1 个）
- // 3. 调用 OutputColorShape 写入 STEP 文件
+ // 2. 导出前对每个 TopoDS_Shape 应用其 AIS 对象当前的 LocalTransformation
+ // 3. 将多个 shape 合并为一个 Compound（如果多于 1 个）
+ // 4. 调用 OutputColorShape 写入 STEP 文件
  void Ui_MainWindow::saveModel()
  {
  	 QMdiSubWindow* subWin = mdiArea->currentSubWindow();
@@ -875,12 +926,27 @@ Ui_MainWindow::Ui_MainWindow()
  				 for (int i = 0; i < root->childCount(); ++i)
  					 src << root->child(i);
 
- 			 // 提取 AIS_ColoredShape 指针中的 TopoDS_Shape
+ 			 // 提取 AIS_ColoredShape 指针中的 TopoDS_Shape, 并应用当前 LocalTransformation
  			 for (auto* it : src)
  			 {
  				 QVariant ptrVar = it->data(0, Qt::UserRole);
  				 AIS_ColoredShape* ais = reinterpret_cast<AIS_ColoredShape*>(ptrVar.value<void*>());
- 				 if (ais) shapes.push_back(ais->Shape());
+ 				 if (!ais) continue;
+
+ 					 TopoDS_Shape baseShape = ais->Shape();
+ 					 if (baseShape.IsNull()) continue;
+
+ 					 gp_Trsf loc = ais->LocalTransformation();
+ 					 // 判断是否为单位变换
+ 					 if (loc.Form() != gp_Identity)
+ 					 {
+ 						 BRepBuilderAPI_Transform tr(baseShape, loc, true); // 复制并应用变换
+ 						 shapes.push_back(tr.Shape()); // 已带装配姿态
+ 					 }
+ 					 else
+ 					 {
+ 						 shapes.push_back(baseShape); // 原始姿态
+ 					 }
  			 }
  		 }
  	 }
@@ -918,3 +984,76 @@ Ui_MainWindow::Ui_MainWindow()
  	 OutputColorShape(fileName.toLocal8Bit().constData(), outShape);
  	 QMessageBox::information(this, QStringLiteral("完成"), QStringLiteral("保存成功"));
  }
+
+ // 新增: 从 JSON 加载装配信息
+ void Ui_MainWindow::loadAssemblyJson()
+ {
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        QStringLiteral("打开工程 / 装配 JSON"),
+        pPreFilePath,
+        QStringLiteral("JSON (*.json)")
+    );
+    if (fileName.isEmpty()) return;
+
+    pPreFilePath = QFileInfo(fileName).absolutePath();
+
+    // 1) 获取或创建窗口与 OCCTWidget
+    OCCTWidget* pOCCWidget = nullptr; OCCSubWindow* subWindow = nullptr;
+    if (!mdiArea->subWindowList().isEmpty()) {
+        subWindow = (OCCSubWindow*)mdiArea->currentSubWindow();
+        if (subWindow) pOCCWidget = qobject_cast<OCCTWidget*>(subWindow->widget());
+    }
+    if (!pOCCWidget) {
+        subWindow = AddSubWindow();
+        pOCCWidget = new OCCTWidget(subWindow);
+        pOCCWidget->setMainWindow(this);
+        pOCCWidget->setPartGraph(&partGraph);
+        subWindow->setWidget(pOCCWidget);
+        subWindow->bInitialize = true;
+        subWindow->show();
+        SetupViewerDisplay(pOCCWidget->get3dViewer(), pOCCWidget->getInteractiveContext());
+    } else {
+        pOCCWidget->setPartGraph(&partGraph);
+    }
+
+    // 2) 清空旧场景与建模树
+    if (auto ctx = pOCCWidget->getInteractiveContext(); !ctx.IsNull()) ctx->RemoveAll(Standard_True);
+    pOCCWidget->m_models.clear();
+    if (featureTreeWidget) {
+        featureTreeWidget->clear(); featureTreeWidget->setColumnCount(2);
+        featureTreeWidget->setHeaderLabels({ QStringLiteral("类型"), QStringLiteral("状态") });
+        QTreeWidgetItem* root = new QTreeWidgetItem(featureTreeWidget);
+        root->setText(0, QStringLiteral("模型")); root->setText(1, QStringLiteral("状态"));
+        featureTreeWidget->addTopLevelItem(root);
+    }
+
+    // 3) 通过 JsonModelLoader 自动导入所有零件
+    JsonModelLoader loader(pOCCWidget, featureTreeWidget);
+    if (!partGraph.LoadFromJson(fileName.toLocal8Bit().constData(), &loader)) {
+        QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("加载装配信息失败"));
+        return;
+    }
+
+    partGraph.PrintSummary();
+
+    // 4) 统一视图自适应
+    if (auto view = pOCCWidget->get3dView(); !view.IsNull()) { view->FitAll(); view->MustBeResized(); }
+
+    QMessageBox::information(this, QStringLiteral("完成"), QStringLiteral("工程已恢复（零件 + 装配）"));
+ }
+
+// 新增: 保存当前装配信息到 JSON
+void Ui_MainWindow::saveAssemblyJson()
+{
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        QStringLiteral("保存装配信息 JSON"),
+        pPreFilePath,
+        QStringLiteral("JSON (*.json)")
+    );
+    if (fileName.isEmpty()) return;
+    pPreFilePath = QFileInfo(fileName).absolutePath();
+    partGraph.SaveToJson(fileName.toLocal8Bit().constData());
+    QMessageBox::information(this, QStringLiteral("完成"), QStringLiteral("装配信息已保存"));
+}

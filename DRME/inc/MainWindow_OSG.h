@@ -77,6 +77,8 @@ public:
 
 	QAction* actionUndo;
 	QAction* actionRedo;
+	QAction* actionLoadAssembly; // 已有: 加载装配信息 JSON
+	QAction* actionSaveAssembly; // 新增: 保存装配信息 JSON
 
 	QWidget *centralwidget;
 	QMdiArea *mdiArea;
@@ -204,6 +206,10 @@ public:
 		actionUndo->setObjectName(QString::fromUtf8("actionUndo"));
 		actionRedo = new QAction(MainWindow);
 		actionRedo->setObjectName(QString::fromUtf8("actionRedo"));
+		actionLoadAssembly = new QAction(MainWindow); // 已有
+		actionLoadAssembly->setObjectName(QString::fromUtf8("actionLoadAssembly"));
+		actionSaveAssembly = new QAction(MainWindow); // 新增: 保存
+		actionSaveAssembly->setObjectName(QString::fromUtf8("actionSaveAssembly"));
 
 		centralwidget = new QWidget(MainWindow);
 		centralwidget->setObjectName(QString::fromUtf8("centralwidget"));
@@ -261,6 +267,8 @@ public:
 		// add undo/redo into same menu
 		menu->addAction(actionUndo);
 		menu->addAction(actionRedo);
+		menu->addAction(actionLoadAssembly);
+		menu->addAction(actionSaveAssembly); // 新增: 保存装配信息
 
 		menu_2->addAction(action_16);
 		menu_2->addAction(action_22);
@@ -290,6 +298,8 @@ public:
 		// add to toolbar for quick access
 		toolBar->addAction(actionUndo);
 		toolBar->addAction(actionRedo);
+		toolBar->addAction(actionLoadAssembly);
+		toolBar->addAction(actionSaveAssembly); // 新增: 工具栏按钮
 
         retranslateUi(MainWindow);
 
@@ -307,9 +317,12 @@ public:
 		connect(this->action_8, &QAction::triggered, this, &Ui_MainWindow::FuelRoadDesign);
 		connect(this->action_16, &QAction::triggered, this, &Ui_MainWindow::ViewCascade);
 		connect(this->action_22, &QAction::triggered, this, &Ui_MainWindow::ViewTiled);
+		connect(action_13, &QAction::triggered, this, &Ui_MainWindow::saveModel); // 新增: 保存按钮绑定
 
 		connect(actionUndo, &QAction::triggered, this, &Ui_MainWindow::doUndo);
 		connect(actionRedo, &QAction::triggered, this, &Ui_MainWindow::doRedo);
+		connect(actionLoadAssembly, &QAction::triggered, this, &Ui_MainWindow::loadAssemblyJson);
+		connect(actionSaveAssembly, &QAction::triggered, this, &Ui_MainWindow::saveAssemblyJson); // 新增: 保存装配信息 JSON
 
 		connect(pQTabWidget, &QTabWidget::currentChanged, this, [this](int index) {
 			
@@ -357,7 +370,8 @@ public:
 		// Fix: use proper UTF-8 Chinese instead of mojibake escape sequence
 		actionUndo->setText(QStringLiteral("撤销"));
 		actionRedo->setText(QStringLiteral("重做"));
-
+		actionLoadAssembly->setText(QStringLiteral("加载装配信息"));
+		actionSaveAssembly->setText(QStringLiteral("保存装配信息")); // 新增: 保存装配信息
 
 		menu->setTitle(QCoreApplication::translate("MainWindow", "\346\226\207\344\273\266", nullptr));
 		menu_2->setTitle(QCoreApplication::translate("MainWindow", "\350\247\206\345\233\276", nullptr));
@@ -390,6 +404,8 @@ public:
 	void deleteParts(const QList<QTreeWidgetItem*>& items); // <--- 标注: 删除功能声明位置
 	// 替换单个零件（支持撤销）
 	void replacePart(QTreeWidgetItem* item, const QString& stepFile); // <--- 标注: 替换功能声明位置
+	void loadAssemblyJson(); // 已有: 从 JSON 加载装配工程
+	void saveAssemblyJson(); // 新增: 保存当前装配到 JSON
 };
 
 namespace Ui {

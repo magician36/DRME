@@ -150,6 +150,7 @@
   <ItemGroup>
     <ClInclude Include="inc\AIS_ModelWithAxis.h" />
     <ClInclude Include="inc\BasicFunction.h" />
+    <ClInclude Include="inc\IModelLoader.h" />
     <ClInclude Include="inc\OCCInclude.h" />
     <ClInclude Include="inc\OCCModeling.h" />
     <ClInclude Include="inc\OCCPart.h" />

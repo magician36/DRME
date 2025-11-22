@@ -84,7 +84,7 @@ void OCCModeling::LoadModelToWidget(
     std::string safeName(utf8Name.constData());
 
     const auto& radii = model->GetAllRadii();
-    partGraph.AddPart(safeName, partType, model, (radii.empty() ? 0.0 : radii.front()));
+    partGraph.AddPart(safeName, partType, model, (radii.empty() ? 0.0 : radii.front()), sFileName); // 传入 sourcePath
     partGraph.SaveToJson("C:/Users/Administrator/Desktop/stp/PartLibrary.json");
     partGraph.PrintSummary();
 

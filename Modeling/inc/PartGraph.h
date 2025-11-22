@@ -7,7 +7,8 @@
 #include <json.hpp>
 
 class AIS_ModelWithAxis;
-class PartAssembler;  // 前向声明
+class PartAssembler;
+class IModelLoader;   // 前向声明
 
 using json = nlohmann::json;
 
@@ -64,14 +65,16 @@ struct PartInfo
 
     bool isLockedOnRod = false;                         //  是否是否固定
     std::vector<std::string> connectedParts;            //  和谁装配
+
+    std::string sourcePath;                             // 新增: 原始几何来源路径
 };
 
 // === 零件图：管理所有零件 ===
 class PartGraph
 {
 public:
-    void AddPart(const std::string& name, PartType type, const Handle(AIS_ModelWithAxis)& model, double mainRadius);
-    //void AddHole(const std::string& partName, HoleType holeType, const gp_Ax1& axis, double radius);
+    // 新增: 添加 sourcePath 参数
+    void AddPart(const std::string& name, PartType type, const Handle(AIS_ModelWithAxis)& model, double mainRadius, const std::string& sourcePath);
 
     void AddConstraint(const std::string& partName, const std::string& targetName, HoleType type);
 
@@ -81,7 +84,11 @@ public:
 
     void PrintSummary() const;
     void SaveToJson(const std::string& file) const;
-    
+    bool LoadFromJson(const std::string& file); // 原始版本: 仅读结构, 不自动建模
+
+    // 新增: 自动建模版本 (如果模型为空且提供 loader 则尝试重建)
+    bool LoadFromJson(const std::string& file, IModelLoader* loader);
+
     // 只读访问函数
     const std::map<std::string, PartInfo>& GetParts() const { return parts; }
 

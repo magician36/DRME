@@ -38,6 +38,7 @@
 #include <AIS_ColoredShape.hxx>
 #include <AIS_Shape.hxx>
 #include <AIS_Manipulator.hxx>
+#include <vector>
 #ifdef _WIN32
 #include <WNT_Window.hxx>
 #else
@@ -76,10 +77,13 @@ public:
 
     // 根据 AIS_ModelWithAxis 创建可拾取的轴线
     void CreateAxisLines(const Handle(AIS_ModelWithAxis)& model);
-	//
+
+    // 新增：加载 STL 到当前窗口（只渲染）
+    void loadStlFile(const QString& filePath);
+	// 单装配模型引用（原逻辑保留）
 	AIS_ColoredShape* ais_shape = nullptr;
 
-	//
+	// 当前视图主 shape（兼容旧逻辑）
 	TopoDS_Shape aViewShape;
 
 	Handle(AIS_Manipulator) aManipulator =  new AIS_Manipulator();
@@ -89,6 +93,9 @@ public:
     
     // 所有加载的模型对象
     std::vector<Handle(AIS_ModelWithAxis)> m_models;  
+
+    // ====== 新增：所有 STL 只渲染模型 ======
+    std::vector<Handle(AIS_ColoredShape)> m_stlShapes;
 
     bool m_isAssemblyMode = false;
     void setAssemblyMode(bool enable) { m_isAssemblyMode = enable; }
