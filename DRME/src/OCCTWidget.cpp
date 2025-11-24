@@ -25,38 +25,6 @@
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
 #include "OCCBrepDataProcess.h"
-#include <QFileInfo> // 新增: 判断扩展名
-#include <QString> // 新增: 直接使用 QString 接口
-#include <string>
-
-// 新增: 仅渲染 STL 文件
-void OCCTWidget::loadStlFile(const QString& filePath)
-{
-    if (filePath.isEmpty())
-        return;
-
-    TopoDS_Shape stlShape = ImportStl(filePath.toLocal8Bit().constData());
-    if (stlShape.IsNull()) {
-        QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("读取 STL 失败"));
-        return;
-    }
-
-    Handle(AIS_ColoredShape) ais = new AIS_ColoredShape(stlShape);
-    m_stlShapes.push_back(ais);
-
-    if (!m_InteractiveContext.IsNull()) {
-        m_InteractiveContext->Display(ais, Standard_True);
-        ApplyDisplayAttributes(m_InteractiveContext, Handle(AIS_InteractiveObject)(ais), Standard_False);
-    }
-
-    aViewShape = stlShape;
-    ais_shape  = ais.get();
-
-    if (!m_3dView.IsNull()) {
-        m_3dView->FitAll();
-        m_3dView->MustBeResized();
-    }
-}
 
 OCCTWidget::OCCTWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -195,7 +163,7 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 		m_yValue = event->y();
 
 		// 检测是否选中对象
-		AIS_StatusOfPick t_pick_status = m_InteractiveContext->SelectDetected();																																		
+		AIS_StatusOfPick t_pick_status = m_InteractiveContext->SelectDetected();																												
 		QMenu* menu = new QMenu();
 
 		if (t_pick_status == AIS_SOP_OneSelected)
@@ -225,6 +193,7 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 			}
 			else
 			{	
+				
 				QAction* actManip = new QAction(QStringLiteral("操纵"), menu);
 				menu->addAction(actManip);
 
@@ -419,7 +388,7 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 			&& m_InteractiveContext->HasDetected()
 			&& m_InteractiveContext->DetectedInteractive() == aManipulator)
 		{
-			// 点击到操纵器 → 开始变換（注意 StartTransform 的签名你项目中用的是 (x,y,view)）
+			// 点击到操纵器 → 开始变换（注意 StartTransform 的签名你项目中用的是 (x,y,view)）
 			aManipulator->StartTransform(event->pos().x(), event->pos().y(), m_3dView);
 
 			// 标记：本次拖拽会话是操纵器
@@ -554,30 +523,31 @@ void OCCTWidget::dragEnterEvent(QDragEnterEvent* event)
 
 void OCCTWidget::dropEvent(QDropEvent* event)
 {
-    QString filePath;
-    if (event->mimeData()->hasUrls())
-        filePath = event->mimeData()->urls().first().toLocalFile();
-    else
-        filePath = event->mimeData()->text();
+	QString filePath;
 
-    if (filePath.isEmpty())
-        return;
+	// 支持两种来源（文件系统 or 零件库）
+	if (event->mimeData()->hasUrls())
+		filePath = event->mimeData()->urls().first().toLocalFile();
+	else
+		filePath = event->mimeData()->text();
 
-    QString suffix = QFileInfo(filePath).suffix().toLower();
-    if (suffix == QStringLiteral("stl")) {
-        loadStlFile(filePath);
-        return;
-    }
+	qDebug() << "[DropEvent] File path:" << filePath;
 
-    if (!m_mainWindow) {
-        qDebug() << "[DropEvent] Main window pointer not set!";
-        return;
-    }
+	if (filePath.isEmpty())
+		return;
 
-    OCCModeling::LoadModelToWidget(filePath,
-                                   this,
-                                   m_mainWindow->featureTreeWidget,
-                                   *this->getPartGraph());
+	// === 找到主窗口 ===
+	if (!m_mainWindow) {
+		qDebug() << "[DropEvent] Main window pointer not set!";
+		return;
+	}
+
+	qDebug() << "[DropEvent] Found main window via member pointer:" << m_mainWindow;
+	qDebug() << "[DropEvent] Calling LoadModelToWidget...";
+
+	// === 调用统一的加载逻辑 ===
+	OCCModeling::LoadModelToWidget(filePath, this, m_mainWindow->featureTreeWidget, *this->getPartGraph());
+
 }
 // 平滑缩放核心函数
 void OCCTWidget::zoomViewByWheel(QWheelEvent* event)
@@ -612,11 +582,13 @@ void OCCTWidget::zoomViewByWheel(QWheelEvent* event)
 // 显示模型与轴线（自动加载或提取）
 void OCCTWidget::DisplayAxes(const TopoDS_Shape& shape, const std::string& jsonFile)
 {
-    if (shape.IsNull() || m_InteractiveContext.IsNull()) return;
-    Handle(AIS_ModelWithAxis) model = new AIS_ModelWithAxis(shape, jsonFile);
-    m_InteractiveContext->Display(model, Standard_True);
-    m_models.push_back(model);
-    qDebug() << "[DisplayAxes] 显示模型及其轴线，共" << model->NbAxes() << "条。";
+	if (shape.IsNull() || m_InteractiveContext.IsNull()) return;
+
+	Handle(AIS_ModelWithAxis) model = new AIS_ModelWithAxis(shape, jsonFile);
+	m_InteractiveContext->Display(model, Standard_True);
+	m_models.push_back(model);
+
+	qDebug() << "[DisplayAxes] 显示模型及其轴线，共" << model->NbAxes() << "条。";
 }
 
 // 控制所有模型的轴线显示或隐藏

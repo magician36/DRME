@@ -6,7 +6,6 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QStringLiteral>
-#include <QString> // 新增: 直接使用 QString 接口
 #include <AIS_ColoredShape.hxx>
 #include <Standard_Type.hxx>
 #include <QVariant>
@@ -24,7 +23,6 @@
 #include <fstream>
 #include "IModelLoader.h"
 #include <TopAbs_ShapeEnum.hxx>
-#include <QFileInfo> // 新增: 用于判断扩展名
 
 // ========== 匿名命名空间：JsonModelLoader 实现 ==========
 namespace {
@@ -267,6 +265,7 @@ void Ui_MainWindow::ViewCascade()
  		 subWindow = AddSubWindow();
  		 pOCCWidget = new OCCTWidget(subWindow);
          pOCCWidget->setMainWindow(this);
+ 		 pOCCWidget->setPartGraph(&partGraph);
  		 subWindow->setWidget(pOCCWidget);
  		 subWindow->bInitialize = true;
  		 subWindow->show();
@@ -290,20 +289,16 @@ void Ui_MainWindow::ViewCascade()
  		 for (QMdiSubWindow* win : subWindows) {
  			 if (win->windowTitle() == selectedWin) {
  				 targetWin = win;
+ 				 
  			 }
  		 }
  		 if (!targetWin) return;
  		 pOCCWidget = (OCCTWidget*)targetWin->widget();
  	 }
 
-    QString suffix = QFileInfo(filename).suffix().toLower();
-    if (suffix == QStringLiteral("stl")) {
-        pOCCWidget->loadStlFile(filename);
-        return; // 不走装配逻辑
-    }
-
- 	 // === 原来的装配逻辑：仅用于 STEP/STP ===
+ 	 // ===  PartGraph 绑定 ===
  	 pOCCWidget->setPartGraph(&partGraph);
+
      OCCModeling::LoadModelToWidget(filename, pOCCWidget, featureTreeWidget, partGraph);
  	 
  }
@@ -370,30 +365,30 @@ void Ui_MainWindow::ViewCascade()
  void Ui_MainWindow::Init(QMainWindow* MainWindow)
  {
  	 MainWindow->setCentralWidget(mdiArea);
- mdiArea->setViewMode(QMdiArea::TabbedView);
- mdiArea->setTabsMovable(true);
- mdiArea->setTabsClosable(true);
+ 	 mdiArea->setViewMode(QMdiArea::TabbedView);
+ 	 mdiArea->setTabsMovable(true);
+ 	 mdiArea->setTabsClosable(true);
 
- MainWindow->resize(1200, 800);
+ 	 MainWindow->resize(1200, 800);
 
- //特征控件
- FeatureItems = new QDockWidget(QStringLiteral("建模树"), MainWindow);
- QWidget* FeatureFunctionPanel = new QWidget();
- FeatureFunctionPanel->setFixedWidth(240);
+ 	 //特征控件
+ 	 FeatureItems = new QDockWidget(QStringLiteral("建模树"), MainWindow);
+ 	 QWidget* FeatureFunctionPanel = new QWidget();
+ 	 FeatureFunctionPanel->setFixedWidth(240);
 
- QVBoxLayout* FeatureWidgetLayout = new QVBoxLayout();
- //特征树控件
- featureTreeWidget = new QTreeWidget();
- featureTreeWidget->setColumnCount(2);
- QStringList Labels = { QStringLiteral("类型"),QStringLiteral("状态") };
- featureTreeWidget->setHeaderLabels(Labels);
- featureTreeWidget->setColumnWidth(0, 140);
- featureTreeWidget->setColumnWidth(1, 80);
- featureTreeWidget->setSelectionMode(QTreeWidget::ExtendedSelection);
+ 	 QVBoxLayout* FeatureWidgetLayout = new QVBoxLayout();
+ 	 //特征树控件
+ 	 featureTreeWidget = new QTreeWidget();
+ 	 featureTreeWidget->setColumnCount(2);
+ 	 QStringList Labels = { QStringLiteral("类型"),QStringLiteral("状态") };
+ 	 featureTreeWidget->setHeaderLabels(Labels);
+ 	 featureTreeWidget->setColumnWidth(0, 140);
+ 	 featureTreeWidget->setColumnWidth(1, 80);
+ 	 featureTreeWidget->setSelectionMode(QTreeWidget::ExtendedSelection);
 
- // 右键菜单支持
- featureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
- QObject::connect(featureTreeWidget, &QTreeWidget::customContextMenuRequested, [this](const QPoint& pos) {
+ 	 // 右键菜单支持
+ 	 featureTreeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+ 	 QObject::connect(featureTreeWidget, &QTreeWidget::customContextMenuRequested, [this](const QPoint& pos) {
  		 QTreeWidgetItem* item = featureTreeWidget->itemAt(pos);
  		 if (!item) return;
  		 QTreeWidgetItem* root = featureTreeWidget->topLevelItem(0);
@@ -1052,8 +1047,19 @@ void Ui_MainWindow::saveAssemblyJson()
         pPreFilePath,
         QStringLiteral("JSON (*.json)")
     );
-    if (fileName.isEmpty()) return;
+
+    if (fileName.isEmpty())
+        return;
+
+    // 更新最近路径
     pPreFilePath = QFileInfo(fileName).absolutePath();
+
+    // 调用 PartGraph 序列化
     partGraph.SaveToJson(fileName.toLocal8Bit().constData());
-    QMessageBox::information(this, QStringLiteral("完成"), QStringLiteral("装配信息已保存"));
+
+    QMessageBox::information(
+        this,
+        QStringLiteral("完成"),
+        QStringLiteral("装配信息已保存")
+    );
 }
