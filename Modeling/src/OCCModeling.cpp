@@ -20,6 +20,10 @@ void OCCModeling::LoadModelToWidget(
     QByteArray utf8File = filePath.toUtf8();
     std::string sFileName(utf8File.constData());
 
+    // detect extension to treat STL as reference/bone
+    QString ext = QFileInfo(filePath).suffix().toLower();
+    const bool isStl = (ext == "stl");
+
     TopoDS_Shape aPartShape = ImportShape(sFileName);
     if (aPartShape.IsNull()) {
         qWarning() << "导入的TopoDS_Shape为空！";
@@ -58,15 +62,25 @@ void OCCModeling::LoadModelToWidget(
         if (root) {
             QTreeWidgetItem* importedItem = new QTreeWidgetItem(root);
             importedItem->setText(0, QFileInfo(filePath).fileName());
-            importedItem->setText(1, QStringLiteral("已导入"));
+            if (isStl) importedItem->setText(1, QStringLiteral("骨头 (参考)"));
+            else importedItem->setText(1, QStringLiteral("已导入"));
             importedItem->setData(0, Qt::UserRole, QVariant::fromValue((void*)model.get()));
+            // mark type for tree consumers
+            importedItem->setData(0, Qt::UserRole + 1, QVariant(isStl ? QStringLiteral("Bone") : QStringLiteral("Part")));
             root->addChild(importedItem);
         }
     }
+
+    // For STL files treat them as reference/bone: do NOT prompt for part type nor add to PartGraph
+    if (isStl) {
+        qDebug() << "[OCCModeling] Loaded STL as bone reference, no PartGraph registration.";
+        return;
+    }
+
     // === 询问零件类型 === 
     QStringList types = { QStringLiteral("Rod"), QStringLiteral("Slider"), QStringLiteral("Screw") };
     bool ok = false;
-    QString selectedType = QInputDialog::getItem( 
+    QString selectedType = QInputDialog::getItem(
         pOCCWidget,
         QStringLiteral("零件类型"),
         QStringLiteral("请选择该零件的类型："),
