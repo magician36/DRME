@@ -32,9 +32,9 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         std::cerr << "[PartAssembler] PartGraph 为空" << std::endl;
         return false;
     }
-    qDebug() << "[AssembleParts] 输入参数:"
-        << "moving =" << QString::fromStdString(partA)
-        << "fixed =" << QString::fromStdString(partB)
+    qDebug() << "[AssembleParts] 输入参数:"\
+        << "moving =" << QString::fromStdString(partA)\
+        << "fixed =" << QString::fromStdString(partB)\
         << "hole=" << holeIndexB;
 
     // 通过 friend 访问获取零件信息（可修改）
@@ -70,9 +70,9 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
     }
     HoleType targetHoleType = infoB.holes[holeIndexB].first;
 
-    qDebug().noquote() << QString("[PartAssembler] 目标孔: 零件=%1, 索引=%2, 类型=%3")
-        .arg(QString::fromStdString(partB))
-        .arg(holeIndexB)
+    qDebug().noquote() << QString("[PartAssembler] 目标孔: 零件=%1, 索引=%2, 类型=%3")\
+        .arg(QString::fromStdString(partB))\
+        .arg(holeIndexB)\
         .arg(targetHoleType == HoleType::RodHole ? "RodHole" : "ScrewHole");
 
     // === 查找源零件上的匹配孔 ===
@@ -88,16 +88,15 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         sourceAxis.Transform(transformA);
     }
 
-    // === 如果方向反向，翻转源轴 ===
-// （更新逻辑：普通件保持同向；若为“螺钉 + 螺孔”则希望最终反向）
+    // === 方向校正：始终使源轴与目标孔轴同向（若点积<0则翻转） ===
     {
         gp_Dir dirS = sourceAxis.Direction();
         gp_Dir dirT = targetAxis.Direction();
-        const bool invertForScrew = (infoA.type == PartType::Screw && targetHoleType == HoleType::ScrewHole);
-        // XOR 逻辑：普通件 -> dot<0 时翻；螺钉(需反向) -> dot>=0 时翻
-        if (((dirS.Dot(dirT) < 0.0) ^ invertForScrew)) {
+        // 原逻辑含螺钉反向特殊处理，现统一：保持同向，避免用户反馈的“螺钉方向装反”
+        if (dirS.Dot(dirT) < 0.0) {
             dirS.Reverse();
             sourceAxis = gp_Ax1(sourceAxis.Location(), dirS);
+            qDebug() << "[PartAssembler] 源轴方向已翻转以与目标孔同向";
         }
     }
 
@@ -236,8 +235,8 @@ bool PartAssembler::AssembleParts(const std::string& partA, const std::string& p
         infoA.model->SetLocalTransformation(L2);
 
         if (!m_context.IsNull()) m_context->Redisplay(infoA.model, Standard_False);
-        qDebug().noquote() << QString("[PartAssembler] 自动插入到螺孔：δ=%1, 厚度=%2, len=%3%4")
-            .arg(delta,0,'f',3).arg(thickness,0,'f',3).arg(screwLenAxis,0,'f',3)
+        qDebug().noquote() << QString("[PartAssembler] 自动插入到螺孔：δ=%1, 厚度=%2, len=%3%4")\
+            .arg(delta,0,'f',3).arg(thickness,0,'f',3).arg(screwLenAxis,0,'f',3)\
             .arg(foundScrewHole?QString():QString(" (fallback)"));
 
         return true;
