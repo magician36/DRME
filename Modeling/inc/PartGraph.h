@@ -5,6 +5,7 @@
 #include <gp_Ax1.hxx>
 #include <gp_Trsf.hxx>
 #include <json.hpp>
+#include <AIS_InteractiveContext.hxx>
 
 class AIS_ModelWithAxis;
 class PartAssembler;
@@ -69,6 +70,13 @@ struct PartInfo
     std::string sourcePath;                             // 新增: 原始几何来源路径
 };
 
+// === 装配组信息（方案 A 需要的最小数据） ===
+struct AssemblyInfo
+{
+    std::vector<std::string> members; // 成员零件名称
+    gp_Trsf transform; // 组级变换（累积）
+};
+
 // === 零件图：管理所有零件 ===
 class PartGraph
 {
@@ -101,6 +109,15 @@ public:
     // 更新零件的本地变换（写回内存），用于操纵器结束时持久化
     void UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf);
 
+    // === 装配组管理（方案 A） ===
+    bool CreateAssembly(const std::string& name, const std::vector<std::string>& members);
+    bool RemoveAssembly(const std::string& name);
+    bool AddPartToAssembly(const std::string& assemblyName, const std::string& partName);
+    std::vector<std::string> GetAssemblyMembers(const std::string& name) const;
+    bool MoveAssembly(const std::string& name, const gp_Trsf& delta, const Handle(AIS_InteractiveContext)& ctx = Handle(AIS_InteractiveContext)());
+    // 查找某个零件属于哪个装配（如果有）
+    std::string FindAssemblyForPart(const std::string& partName) const;
+
     // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
     // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）
     const MateConstraint* FindRodMateForSlider(const std::string& sliderName) const;
@@ -114,4 +131,7 @@ private:
     DOFInfo InferDOF(PartType type);
     std::map<std::string, PartInfo> parts;
     std::vector<MateConstraint> mates;  // 所有装配约束
+
+    // 装配组存储
+    std::map<std::string, AssemblyInfo> assemblies;
 };

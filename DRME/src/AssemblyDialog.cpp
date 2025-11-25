@@ -387,84 +387,126 @@ void AssemblyDialog::onFinishClicked()
 {
     if (m_selectedA.empty() || m_selectedB.empty() || m_selectedHoleIndex < 0)
     {
-        QMessageBox::warning(this, QStringLiteral("装配"),
-            QStringLiteral("请先选择完整的装配路径（A表→B表→C表）"));
+        QMessageBox::warning(this, QStringLiteral("装配"), 
+                           QStringLiteral("请先选择完整的装配路径（A表→B表→C表）"));
         return;
     }
 
     qDebug() << "[装配完成] 准备调用装配函数 →"
-        << "A:" << QString::fromUtf8(m_selectedA.c_str())
-        << "B:" << QString::fromUtf8(m_selectedB.c_str())
+        << "A:" << QString::fromStdString(m_selectedA)
+        << "B:" << QString::fromStdString(m_selectedB)
         << "孔:" << m_selectedHoleIndex;
 
     const auto& parts = m_graph->GetParts();
     auto itA = parts.find(m_selectedA);
     auto itB = parts.find(m_selectedB);
     if (itA == parts.end() || itB == parts.end()) {
-        QMessageBox::critical(this, QStringLiteral("装配"),
-            QStringLiteral("找不到选中的零件！"));
+        QMessageBox::critical(this, QStringLiteral("装配"), 
+                            QStringLiteral("找不到选中的零件！"));
         return;
     }
 
-    // === 永远：A 固定，B 移动 ===
-    std::string fixedPart = m_selectedA;   // 不动
-    std::string movingPart = m_selectedB;   // 移动
-    const PartInfo& Fixed = itA->second;
-    const PartInfo& Moving = itB->second;
+    const PartInfo& A = itA->second;
+    const PartInfo& B = itB->second;
 
-    ConstraintManager mgr(m_graph, m_context);
+    ConstraintManager mgr(m_graph, m_context); // 使用新的统一管理
 
-    // 特殊装配逻辑...
-    if (Fixed.type == PartType::Slider && Moving.type == PartType::Screw)
-    {
+    // Helper: ensure an assembly exists containing the given members
+    auto ensureAssemblyWithMembers = [&](const std::vector<std::string>& members){
+        if (!m_graph) return;
+        // try to find existing assembly among members
+        std::string existing;
+        for (const auto& p : members) {
+            existing = m_graph->FindAssemblyForPart(p);
+            if (!existing.empty()) break;
+        }
+        if (!existing.empty()) {
+            for (const auto& p : members) m_graph->AddPartToAssembly(existing, p);
+            return;
+        }
+        // create a new assembly name
+        std::string name;
+        if (members.size() >= 2) name = members[0] + "_" + members[1] + "_assembly";
+        else name = members[0] + "_assembly";
+        // try to create unique name if needed
+        std::string cand = name;
+        int k = 1;
+        while (!m_graph->CreateAssembly(cand, members) && k < 10000) {
+            cand = name + "_" + std::to_string(k++);
+        }
+    };
+
+    // 统一语义：始终把 A 视为固定件（fixed），B 视为移动件（moving）
+    std::string fixedPart = m_selectedA;
+    std::string movingPart = m_selectedB;
+    const PartInfo& Fixed = A;
+    const PartInfo& Moving = B;
+
+    // 1) 固定为滑块，移动为螺钉：螺钉装入滑块（建立约束）
+    if (Fixed.type == PartType::Slider && Moving.type == PartType::Screw) {
         auto res = mgr.AssembleScrewToSlider(movingPart, fixedPart, m_selectedHoleIndex);
         if (!res.success) {
-            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("螺钉装配失败"));
+            QMessageBox::critical(this, QStringLiteral("装配"), QString::fromStdString(res.message));
             return;
         }
-        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("螺钉 → 滑块 装配完成"));
-        resetUI();
+        ensureAssemblyWithMembers({fixedPart, movingPart});
+        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，螺钉→滑块 约束已建立。"));
+        populatePartATable();
+        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
+        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
+        accept();
         return;
     }
 
-    if (Fixed.type == PartType::Rod && Moving.type == PartType::Slider)
-    {
+    // 2) 固定为棒，移动为滑块：滑块装到棒上（建立滑块→棒约束）
+    if (Fixed.type == PartType::Rod && Moving.type == PartType::Slider) {
         auto res = mgr.AssembleSliderToRod(movingPart, fixedPart, m_selectedHoleIndex);
         if (!res.success) {
-            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("滑块 → 棒 装配失败"));
+            QMessageBox::critical(this, QStringLiteral("装配"), QString::fromStdString(res.message));
             return;
         }
-        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("滑块 → 棒 装配成功"));
-        resetUI();
+        ensureAssemblyWithMembers({fixedPart, movingPart});
+        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，滑块→棒 约束已建立。"));
+        populatePartATable();
+        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
+        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
+        accept();
         return;
     }
 
-    if (Fixed.type == PartType::Slider && Moving.type == PartType::Rod)
-    {
+    // 3) 固定为滑块，移动为棒：使用通用的几何对齐（不写约束）——棒移入滑块孔
+    if (Fixed.type == PartType::Slider && Moving.type == PartType::Rod) {
         PartAssembler assembler(m_graph, m_context);
-        bool ok = assembler.AssembleParts(movingPart, fixedPart, m_selectedHoleIndex);
-        if (!ok) {
-            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("棒 → 滑块 装配失败"));
+        bool success = assembler.AssembleParts(movingPart, fixedPart, m_selectedHoleIndex);
+        if (!success) {
+            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("装配失败，请检查选择。"));
             return;
         }
-        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("棒 → 滑块 装配成功"));
-        resetUI();
+        ensureAssemblyWithMembers({fixedPart, movingPart});
+        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("装配完成(未建立约束)。"));
+        populatePartATable();
+        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
+        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
+        accept();
         return;
     }
 
+    // 4) 其他任意组合：退化为通用几何对齐（B 移动到 A）
     {
         PartAssembler assembler(m_graph, m_context);
         bool success = assembler.AssembleParts(movingPart, fixedPart, m_selectedHoleIndex);
         if (!success) {
-            QMessageBox::critical(this, QStringLiteral("装配"),
-                QStringLiteral("普通装配失败，请检查选择。"));
+            QMessageBox::critical(this, QStringLiteral("装配"), QStringLiteral("装配失败，请检查选择。"));
             return;
         }
-        QMessageBox::information(this, QStringLiteral("装配"),
-            QStringLiteral("普通装配完成（无约束）。"));
+        ensureAssemblyWithMembers({fixedPart, movingPart});
+        QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("装配完成(未建立约束)。"));
+        populatePartATable();
+        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
+        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
+        accept();
+        return;
     }
-
-    resetUI();
 }
 
 void AssemblyDialog::clearHighlight()
