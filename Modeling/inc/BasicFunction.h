@@ -2,6 +2,7 @@
 
 #include "OCCInclude.h"
 #include <AIS_Shape.hxx>
+#include <AIS_InteractiveObject.hxx>
 #include <AIS_InteractiveContext.hxx>
 #include <string>
 #include <vector>
@@ -19,3 +20,6 @@ Handle(AIS_Shape) ImportStlToAIS(const std::string& sFileName, const Handle(AIS_
 // 读取 STL 并构造为 AIS_ModelWithAxis（包含操纵杆支持），返回 handle 并在 context 中显示。
 // 调用者可以随后调用 OCCTWidget::RememberAttachedModel(model) 并使用操纵器。
 Handle(AIS_ModelWithAxis) ImportStlToAISModel(const std::string& sFileName, const Handle(AIS_InteractiveContext)& context);
+
+// 新增：轻量 STL 加载（不进 PartGraph，只显示）
+Handle(AIS_InteractiveObject)LoadStlLightweight(const std::string& file,const Handle(AIS_InteractiveContext)& ctx);
