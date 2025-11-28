@@ -8,6 +8,8 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <QtWidgets/qinputdialog.h>
 
+#include "BasicFunction.h"              // 这里面有 ImportStp 和 LoadStlLightweight
+
 void OCCModeling::LoadModelToWidget(
     const QString& filePath,
     OCCTWidget* pOCCWidget,
@@ -17,90 +19,141 @@ void OCCModeling::LoadModelToWidget(
     if (!pOCCWidget || filePath.isEmpty())
         return;
 
-    QByteArray utf8File = filePath.toUtf8();
-    std::string sFileName(utf8File.constData());
+    // 统一路径处理
+    const std::string sFileName = filePath.toUtf8().constData();
+    const QString ext = QFileInfo(filePath).suffix().toLower();
 
-    // detect extension to treat STL as reference/bone
-    QString ext = QFileInfo(filePath).suffix().toLower();
     const bool isStl = (ext == "stl");
+    const bool isStep = (ext == "stp" || ext == "step");
 
-    TopoDS_Shape aPartShape = ImportShape(sFileName);
-    if (aPartShape.IsNull()) {
-        qWarning() << "导入的TopoDS_Shape为空！";
+    Handle(AIS_InteractiveContext) ctx = pOCCWidget->getInteractiveContext();
+    if (ctx.IsNull())
         return;
+
+
+    // =====================================================
+    //                 STL: 轻量显示模式
+    // =====================================================
+    if (isStl)
+    { 
+        // 最终显示的模型对象
+        Handle(AIS_InteractiveObject) modelIO =
+            LoadStlLightweight(sFileName, ctx);
+     
+        if (modelIO.IsNull()) {
+            qWarning() << QStringLiteral("[OCCModeling] STL 加载失败");
+            return;
+        }
+
+        // --- 记录到 widget 模型列表 ---
+        pOCCWidget->m_models.push_back(modelIO);
+
+		// --- 强制刷新视图几何 ---
+        ctx->UpdateCurrentViewer();
+
+        // --- 视图更新 ---
+        Handle(V3d_View) view = pOCCWidget->get3dView();
+        if (!view.IsNull()) {
+            view->FitAll();
+            view->Redraw();
+        }
+
+        // --- 更新建模树 ---
+        if (featureTree) {
+            QTreeWidgetItem* root = featureTree->topLevelItem(0);
+            if (root) {
+                QTreeWidgetItem* item = new QTreeWidgetItem(root);
+                item->setText(0, QFileInfo(filePath).fileName());
+                item->setText(1, QStringLiteral("骨头 (参考)"));
+                item->setData(0, Qt::UserRole, QVariant::fromValue((void*)modelIO.get()));
+                item->setData(0, Qt::UserRole + 1, QStringLiteral("Bone"));
+                root->addChild(item);
+            }
+        }
+
+        qDebug() << QStringLiteral("[OCCModeling] STL 显示完毕.");
+        return; // STL 完整结束，不进入 PartGraph
     }
 
-    // === 创建带轴线的 AIS 模型 ===
-    std::string axisFile = sFileName + "_axes.json";
-    Handle(AIS_ModelWithAxis) model = new AIS_ModelWithAxis(aPartShape, axisFile);
-    pOCCWidget->m_models.push_back(model);
+    // =====================================================
+    //            STEP：真实几何 + 轴线提取 + 装配
+    // =====================================================
+    if (isStep)
+    {
+        TopoDS_Shape shape = ImportStp(sFileName);
+        if (shape.IsNull()) {
+            qWarning() << "导入的 STEP Shape 为空！";
+            return;
+        }
 
-    // === 绑定操控器 ===
-    if (pOCCWidget->aManipulator.IsNull())
-        pOCCWidget->aManipulator = new AIS_Manipulator();
-    pOCCWidget->aManipulator->Attach(model);
+        std::string axisFile = sFileName + "_axes.json";
+        Handle(AIS_ModelWithAxis) model = new AIS_ModelWithAxis(shape, axisFile);
 
-    // === 显示模型 ===
-    Handle(AIS_InteractiveContext) ctx = pOCCWidget->getInteractiveContext();
-    if (!ctx.IsNull()) {
+        Handle(AIS_InteractiveObject) modelIO = model; // 统一模型对象
+
+        pOCCWidget->m_models.push_back(model);
+
+        // --- 绑定操控器 ---
+        if (pOCCWidget->aManipulator.IsNull())
+            pOCCWidget->aManipulator = new AIS_Manipulator();
+        pOCCWidget->aManipulator->Attach(model);
+
+        // --- 显示 ---
         ctx->Display(model, Standard_True);
         ctx->Activate(AIS_Shape::SelectionMode(TopAbs_SOLID), true);
-    }
 
-    Handle(V3d_View) view = pOCCWidget->get3dView();
-    if (!view.IsNull()) {
-        view->FitAll();
-        view->MustBeResized();
-    }
-
-    pOCCWidget->ais_shape = model.get();
-    pOCCWidget->aViewShape = aPartShape;
-
-    // === 更新建模树 ===
-    if (featureTree) {
-        QTreeWidgetItem* root = featureTree->topLevelItem(0);
-        if (root) {
-            QTreeWidgetItem* importedItem = new QTreeWidgetItem(root);
-            importedItem->setText(0, QFileInfo(filePath).fileName());
-            if (isStl) importedItem->setText(1, QStringLiteral("骨头 (参考)"));
-            else importedItem->setText(1, QStringLiteral("已导入"));
-            importedItem->setData(0, Qt::UserRole, QVariant::fromValue((void*)model.get()));
-            // mark type for tree consumers
-            importedItem->setData(0, Qt::UserRole + 1, QVariant(isStl ? QStringLiteral("Bone") : QStringLiteral("Part")));
-            root->addChild(importedItem);
+        // --- 视图更新 ---
+        Handle(V3d_View) view = pOCCWidget->get3dView();
+        if (!view.IsNull()) {
+            view->FitAll();
+            view->MustBeResized();
         }
-    }
 
-    // For STL files treat them as reference/bone: do NOT prompt for part type nor add to PartGraph
-    if (isStl) {
-        qDebug() << "[OCCModeling] Loaded STL as bone reference, no PartGraph registration.";
+        // --- 更新建模树 ---
+        if (featureTree) {
+            QTreeWidgetItem* root = featureTree->topLevelItem(0);
+            if (root) {
+                QTreeWidgetItem* item = new QTreeWidgetItem(root);
+                item->setText(0, QFileInfo(filePath).fileName());
+                item->setText(1, QStringLiteral("已导入"));
+                item->setData(0, Qt::UserRole, QVariant::fromValue((void*)model.get()));
+                item->setData(0, Qt::UserRole + 1, QStringLiteral("Part"));
+                root->addChild(item);
+            }
+        }
+
+        // === 询问零件类型 ===
+        QStringList types = { "Rod", "Slider", "Screw" };
+        bool ok = false;
+        QString selectedType = QInputDialog::getItem(
+            pOCCWidget,
+            "零件类型",
+            "请选择该零件的类型：",
+            types, 0, false, &ok);
+        if (!ok) return;
+
+        PartType partType = PartType::Rod;
+        if (selectedType == "Slider") partType = PartType::Slider;
+        else if (selectedType == "Screw") partType = PartType::Screw;
+
+        // === 登记到 PartGraph ===
+        QString partName = QFileInfo(filePath).baseName();
+        std::string safeName = partName.toUtf8().constData();
+
+        auto radii = model->GetAllRadii();
+        double mainR = (radii.empty() ? 0.0 : radii.front());
+
+        partGraph.AddPart(safeName, partType, model, mainR, sFileName);
+        partGraph.SaveToJson("C:/Users/Administrator/Desktop/stp/PartLibrary.json");
+        partGraph.PrintSummary();
+
+        qDebug() << "[OCCModeling] STEP 模型加载完成并已记录 PartGraph。";
         return;
     }
 
-    // === 询问零件类型 === 
-    QStringList types = { QStringLiteral("Rod"), QStringLiteral("Slider"), QStringLiteral("Screw") };
-    bool ok = false;
-    QString selectedType = QInputDialog::getItem(
-        pOCCWidget,
-        QStringLiteral("零件类型"),
-        QStringLiteral("请选择该零件的类型："),
-        types, 0, false, &ok);
-    if (!ok) return;
-    PartType partType = PartType::Rod;
-    if (selectedType.contains(QStringLiteral("Slider")))
-        partType = PartType::Slider;
-    else if (selectedType.contains(QStringLiteral("Screw"))) 
-        partType = PartType::Screw;
-
-    // === 登记到 PartGraph ===
-    QString partName = QFileInfo(filePath).baseName();
-    QByteArray utf8Name = partName.toUtf8();
-    std::string safeName(utf8Name.constData());
-
-    const auto& radii = model->GetAllRadii();
-    partGraph.AddPart(safeName, partType, model, (radii.empty() ? 0.0 : radii.front()), sFileName); // 传入 sourcePath
-    partGraph.SaveToJson("C:/Users/Administrator/Desktop/stp/PartLibrary.json");
-    partGraph.PrintSummary();
-
-    qDebug() << "[OCCModeling] 模型加载完成并已记录 PartGraph。";
+    // =====================================================
+    // 不支持的格式
+    // =====================================================
+    QMessageBox::warning(nullptr, "格式不支持",
+        "仅支持 STEP (*.stp, *.step) 和 STL (*.stl) 文件！");
 }

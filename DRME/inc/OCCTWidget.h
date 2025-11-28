@@ -89,7 +89,8 @@ public:
     bool m_usingManipulator = false;
     
     // 所有加载的模型对象
-    std::vector<Handle(AIS_ModelWithAxis)> m_models;  
+    std::vector<Handle(AIS_InteractiveObject)> m_models;
+
 
     bool m_isAssemblyMode = false;
     void setAssemblyMode(bool enable) { m_isAssemblyMode = enable; }

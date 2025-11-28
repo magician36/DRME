@@ -690,13 +690,27 @@ void OCCTWidget::ShowAxes(bool visible)
 
 	for (auto& model : m_models)
 	{
-		model->SetAxesVisible(visible);
-		m_InteractiveContext->Redisplay(model, Standard_False);
+		if (model.IsNull()) continue;
+
+		// 只有 AIS_ModelWithAxis 才有轴线可显隐
+		if (model->IsKind(STANDARD_TYPE(AIS_ModelWithAxis)))
+		{
+			Handle(AIS_ModelWithAxis) mw =
+				Handle(AIS_ModelWithAxis)::DownCast(model);
+
+			if (!mw.IsNull())
+			{
+				mw->SetAxesVisible(visible);
+				m_InteractiveContext->Redisplay(mw, Standard_False);
+			}
+		}
 	}
 
 	m_3dView->Redraw();
 	qDebug() << "[ShowAxes] 所有轴线" << (visible ? "已显示" : "已隐藏");
 }
+
+
 
 // 清除所有模型
 void OCCTWidget::ClearAxes()
