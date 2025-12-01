@@ -442,6 +442,13 @@ void AssemblyDialog::onFinishClicked()
     const PartInfo& Fixed = A;
     const PartInfo& Moving = B;
 
+    auto resetAfterSuccess = [&](){
+        populatePartATable();
+        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
+        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
+        // 不调用 accept()，保持对话框继续打开供后续装配
+    };
+
     // 1) 固定为滑块，移动为螺钉：螺钉装入滑块（建立约束）
     if (Fixed.type == PartType::Slider && Moving.type == PartType::Screw) {
         auto res = mgr.AssembleScrewToSlider(movingPart, fixedPart, m_selectedHoleIndex);
@@ -451,10 +458,7 @@ void AssemblyDialog::onFinishClicked()
         }
         ensureAssemblyWithMembers({fixedPart, movingPart});
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，螺钉→滑块 约束已建立。"));
-        populatePartATable();
-        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
-        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-        accept();
+        resetAfterSuccess();
         return;
     }
 
@@ -467,10 +471,7 @@ void AssemblyDialog::onFinishClicked()
         }
         ensureAssemblyWithMembers({fixedPart, movingPart});
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("拼接完成，滑块→棒 约束已建立。"));
-        populatePartATable();
-        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
-        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-        accept();
+        resetAfterSuccess();
         return;
     }
 
@@ -484,10 +485,7 @@ void AssemblyDialog::onFinishClicked()
         }
         ensureAssemblyWithMembers({fixedPart, movingPart});
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("装配完成(未建立约束)。"));
-        populatePartATable();
-        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
-        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-        accept();
+        resetAfterSuccess();
         return;
     }
 
@@ -501,10 +499,7 @@ void AssemblyDialog::onFinishClicked()
         }
         ensureAssemblyWithMembers({fixedPart, movingPart});
         QMessageBox::information(this, QStringLiteral("装配"), QStringLiteral("装配完成(未建立约束)。"));
-        populatePartATable();
-        m_selectedA.clear(); m_selectedB.clear(); m_selectedHoleIndex = -1; m_sliderName.clear();
-        m_tableB->setRowCount(0); m_tableC->setRowCount(0); clearHighlight();
-        accept();
+        resetAfterSuccess();
         return;
     }
 }

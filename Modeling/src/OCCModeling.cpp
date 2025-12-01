@@ -123,18 +123,18 @@ void OCCModeling::LoadModelToWidget(
         }
 
         // === 询问零件类型 ===
-        QStringList types = { "Rod", "Slider", "Screw" };
+        QStringList types = { QStringLiteral("Rod"), QStringLiteral("Slider"), QStringLiteral("Screw") };
         bool ok = false;
         QString selectedType = QInputDialog::getItem(
             pOCCWidget,
-            "零件类型",
-            "请选择该零件的类型：",
+            QStringLiteral("零件类型"),
+            QStringLiteral("请选择该零件的类型："),
             types, 0, false, &ok);
         if (!ok) return;
 
         PartType partType = PartType::Rod;
-        if (selectedType == "Slider") partType = PartType::Slider;
-        else if (selectedType == "Screw") partType = PartType::Screw;
+        if (selectedType == QStringLiteral("Slider")) partType = PartType::Slider;
+        else if (selectedType == QStringLiteral("Screw")) partType = PartType::Screw;
 
         // === 登记到 PartGraph ===
         QString partName = QFileInfo(filePath).baseName();
