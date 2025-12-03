@@ -54,10 +54,19 @@ public:
                 root = new QTreeWidgetItem(m_tree);
                 root->setText(0, QStringLiteral("模型"));
             }
+            // 为空名称时回退为文件基名
+            QString qName = QString::fromStdString(name);
+            if (qName.trimmed().isEmpty()) {
+                QFileInfo fi(QString::fromStdString(sourcePath));
+                qName = fi.baseName();
+            }
             QTreeWidgetItem* item = new QTreeWidgetItem(root);
-            item->setText(0, QString::fromStdString(name));
-            item->setText(1, QStringLiteral("已加载"));
+            item->setText(0, qName);          // 第一列显示零件名称
+            item->setText(1, QStringLiteral("已加载")); // 第二列显示状态
             item->setData(0, Qt::UserRole, QVariant::fromValue((void*)model.get()));
+            // 额外：存储类型字符串以便需要时检索
+            QString typeStr = (type == PartType::Rod) ? QStringLiteral("Rod") : (type == PartType::Slider) ? QStringLiteral("Slider") : (type == PartType::Screw) ? QStringLiteral("Screw") : QStringLiteral("Bone");
+            item->setData(0, Qt::UserRole + 1, typeStr);
             root->addChild(item);
         }
         return model;
@@ -66,6 +75,53 @@ private:
     OCCTWidget* m_widget = nullptr;
     QTreeWidget* m_tree = nullptr;
 };
+
+// ========== 辅助函数：零件类型转字符串 ==========
+static QString PartTypeToString(PartType t)
+{
+    switch (t) {
+    case PartType::Rod:    return QStringLiteral("Rod");
+    case PartType::Slider: return QStringLiteral("Slider");
+    case PartType::Screw:  return QStringLiteral("Screw");
+    case PartType::Bone:   return QStringLiteral("Bone");
+    default:               return QStringLiteral("Unknown");
+    }
+}
+
+// ========== 辅助函数：从 PartGraph 重建建模树 ==========
+static void RebuildFeatureTreeFromPartGraph(QTreeWidget* featureTree, const PartGraph& graph)
+{
+    if (!featureTree) return;
+
+    featureTree->clear();
+
+    // 顶层节点：装配体
+    QTreeWidgetItem* root = new QTreeWidgetItem(featureTree);
+    root->setText(0, QStringLiteral("装配体"));
+    root->setText(1, QStringLiteral("Assembly"));
+    featureTree->addTopLevelItem(root);
+
+    // 遍历 PartGraph 所有零件
+    const auto& parts = graph.GetParts();
+    for (const auto& kv : parts) {
+        const std::string& name = kv.first;
+        const PartInfo& info = kv.second;
+
+        QTreeWidgetItem* item = new QTreeWidgetItem(root);
+        // 使用 JSON 里的 name 作为建模树显示名
+        item->setText(0, QString::fromStdString(name)); 
+        item->setText(1, PartTypeToString(info.type));
+
+        // 把 AIS_ModelWithAxis* 挂到 item 上，后面选中树节点时可以反查模型
+        if (!info.model.IsNull()) {
+            item->setData(0, Qt::UserRole, QVariant::fromValue((void*)info.model.get()));
+            item->setData(0, Qt::UserRole + 1, PartTypeToString(info.type));
+        }
+    }
+
+    root->setExpanded(true);
+}
+
 } // namespace
 
 Ui_MainWindow::Ui_MainWindow() { }
@@ -1015,13 +1071,6 @@ void Ui_MainWindow::ViewCascade()
     // 2) 清空旧场景与建模树
     if (auto ctx = pOCCWidget->getInteractiveContext(); !ctx.IsNull()) ctx->RemoveAll(Standard_True);
     pOCCWidget->m_models.clear();
-    if (featureTreeWidget) {
-        featureTreeWidget->clear(); featureTreeWidget->setColumnCount(2);
-        featureTreeWidget->setHeaderLabels({ QStringLiteral("类型"), QStringLiteral("状态") });
-        QTreeWidgetItem* root = new QTreeWidgetItem(featureTreeWidget);
-        root->setText(0, QStringLiteral("模型")); root->setText(1, QStringLiteral("状态"));
-        featureTreeWidget->addTopLevelItem(root);
-    }
 
     // 3) 通过 JsonModelLoader 自动导入所有零件
     JsonModelLoader loader(pOCCWidget, featureTreeWidget);
@@ -1030,9 +1079,12 @@ void Ui_MainWindow::ViewCascade()
         return;
     }
 
+    // 4) 重建建模树，把每个零件的名字同步到左侧树
+    RebuildFeatureTreeFromPartGraph(featureTreeWidget, partGraph);
+
     partGraph.PrintSummary();
 
-    // 4) 统一视图自适应
+    // 5) 统一视图自适应
     if (auto view = pOCCWidget->get3dView(); !view.IsNull()) { view->FitAll(); view->MustBeResized(); }
 
     QMessageBox::information(this, QStringLiteral("完成"), QStringLiteral("工程已恢复（零件 + 装配）"));
