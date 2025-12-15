@@ -8,7 +8,7 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <QtWidgets/qinputdialog.h>
 
-#include "BasicFunction.h"              // 这里面有 ImportStp 和 LoadStlLightweight
+#include "BasicFunction.h"              // 这里面有 ImportStp 和 ImportStlToAIS
 
 void OCCModeling::LoadModelToWidget(
     const QString& filePath,
@@ -34,36 +34,40 @@ void OCCModeling::LoadModelToWidget(
     if (gSceneState.Ctx.IsNull()) gSceneState.Ctx = ctx;
 
     // =====================================================
-    //                 STL: 轻量显示模式
+    //                 STL: 真实几何（AIS_Shape）模式
     // =====================================================
     if (isStl)
-    { 
-        // 最终显示的模型对象
-        Handle(AIS_InteractiveObject) modelIO =
-            LoadStlLightweight(sFileName, ctx);
-     
+    {
+        // 1) 读取 STL -> TopoDS_Shape -> AIS_Shape
+        Handle(AIS_Shape) boneAis = ImportStlToAIS(sFileName, ctx);
+        Handle(AIS_InteractiveObject) modelIO = boneAis;
+
         if (modelIO.IsNull()) {
             qWarning() << QStringLiteral("[OCCModeling] STL 加载失败");
             return;
         }
 
-        // --- 记录到 widget 模型列表 ---
+        // 2) 记录到 widget 模型列表
         pOCCWidget->m_models.push_back(modelIO);
 
-        // Call scene manager import
+        // 3) 走场景管理（里面会 Display + 记录 Bones）
         ImportSTL(gSceneState, modelIO);
 
-        // --- 强制刷新视图几何 ---
+        // 4) 确保可拾取面/边/点（建议加上，避免只激活了全局模式但对象没开）
+        ctx->Activate(modelIO, AIS_Shape::SelectionMode(TopAbs_FACE),   Standard_True);
+        ctx->Activate(modelIO, AIS_Shape::SelectionMode(TopAbs_EDGE),   Standard_True);
+        ctx->Activate(modelIO, AIS_Shape::SelectionMode(TopAbs_VERTEX), Standard_True);
+
         ctx->UpdateCurrentViewer();
 
-        // --- 视图更新 ---
+        // 视图更新
         Handle(V3d_View) view = pOCCWidget->get3dView();
         if (!view.IsNull()) {
             view->FitAll();
             view->Redraw();
         }
 
-        // --- 更新建模树 ---
+        // 更新建模树
         if (featureTree) {
             QTreeWidgetItem* root = featureTree->topLevelItem(0);
             if (root) {
@@ -76,8 +80,8 @@ void OCCModeling::LoadModelToWidget(
             }
         }
 
-        qDebug() << QStringLiteral("[OCCModeling] STL 显示完毕.");
-        return; // STL 完整结束，不进入 PartGraph
+        qDebug() << QStringLiteral("[OCCModeling] STL 显示完毕 (AIS_Shape).");
+        return; // STL 不进入 PartGraph
     }
 
     // =====================================================

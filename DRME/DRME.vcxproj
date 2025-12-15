@@ -186,6 +186,7 @@
   <ItemGroup>
     <ClCompile Include="..\Modeling\src\AIS_ModelWithAxis.cpp" />
     <ClCompile Include="src\AssemblyDialog.cpp" />
+    <ClCompile Include="src\BonePointTool.cpp" />
     <ClCompile Include="src\ClosableTabWidget.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow_OSG.cpp" />
@@ -206,6 +207,7 @@
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">moc generate for %(Filename)</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)\moc_%(Filename).cpp</Outputs>
     </QtMoc>
+    <ClInclude Include="inc\BonePointTool.h" />
     <ClInclude Include="inc\ClosableTabWidget.h" />
     <QtMoc Include="inc\MainWindow_OSG.h" />
     <ClInclude Include="inc\OCCBrepDataProcess.h" />

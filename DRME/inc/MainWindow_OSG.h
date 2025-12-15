@@ -79,6 +79,7 @@ public:
 	QAction* actionRedo;
 	QAction* actionLoadAssembly; // 已有: 加载装配信息 JSON
 	QAction* actionSaveAssembly; // 新增: 保存装配信息 JSON
+    QAction* actionBonePointTool = nullptr;   // 骨点装配工具按钮
 
 	QWidget *centralwidget;
 	QMdiArea *mdiArea;
