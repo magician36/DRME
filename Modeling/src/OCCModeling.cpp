@@ -30,8 +30,6 @@ void OCCModeling::LoadModelToWidget(
     if (ctx.IsNull())
         return;
 
-    // ensure global scene ctx
-    if (gSceneState.Ctx.IsNull()) gSceneState.Ctx = ctx;
 
     // =====================================================
     //                 STL: 轻量显示模式
@@ -50,10 +48,7 @@ void OCCModeling::LoadModelToWidget(
         // --- 记录到 widget 模型列表 ---
         pOCCWidget->m_models.push_back(modelIO);
 
-        // Call scene manager import
-        ImportSTL(gSceneState, modelIO);
-
-        // --- 强制刷新视图几何 ---
+		// --- 强制刷新视图几何 ---
         ctx->UpdateCurrentViewer();
 
         // --- 视图更新 ---
@@ -103,10 +98,8 @@ void OCCModeling::LoadModelToWidget(
             pOCCWidget->aManipulator = new AIS_Manipulator();
         pOCCWidget->aManipulator->Attach(model);
 
-        // Call scene manager import for STEP (handles display/transform logic)
-        ImportSTEP(gSceneState, modelIO);
-
-        // Ensure selection mode and view update
+        // --- 显示 ---
+        ctx->Display(model, Standard_True);
         ctx->Activate(AIS_Shape::SelectionMode(TopAbs_SOLID), true);
 
         // --- 视图更新 ---

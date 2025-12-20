@@ -7,262 +7,33 @@
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <QDebug>
 #include <Bnd_Box.hxx>
-#include <BRepBndLib.hxx>
-#include <TopoDS_Shape.hxx>
-#include <cmath>
-
-// Global scene state
-SceneState gSceneState;
-
-// 计算一组对象的包围盒中心，会自动考虑 LocalTransformation
-gp_Pnt ComputeGroupCenter(
-    const Handle(AIS_InteractiveContext)& ctx,
-    const std::vector<Handle(AIS_InteractiveObject)>& group)
+// BasicFunction.cpp
+/*
+TopoDS_Shape ImportStp(std::string sFileName)
 {
-    Bnd_Box totalBox; totalBox.SetGap(0.0);
-    bool has = false;
+    STEPCAFControl_Reader StepCAFReader;
+    StepCAFReader.SetColorMode(true);
+    StepCAFReader.SetNameMode(true);
 
-    for (const auto& obj : group) {
-        if (obj.IsNull()) continue;
+    if (StepCAFReader.ReadFile(sFileName.c_str()) != IFSelect_RetDone)
+        return TopoDS_Shape(); // 返回空形状
 
-        // 尝试获取底层 shape（如果是 AIS_Shape 或 AIS_ModelWithAxis）
-        TopoDS_Shape shape;
-        Handle(AIS_Shape) s = Handle(AIS_Shape)::DownCast(obj);
-        if (!s.IsNull()) {
-            shape = s->Shape();
-        }
-        else {
-            Handle(AIS_ModelWithAxis) m = Handle(AIS_ModelWithAxis)::DownCast(obj);
-            if (!m.IsNull()) {
-                shape = m->Shape();
-            }
-        }
+    Handle(XCAFApp_Application) anApp = XCAFApp_Application::GetApplication();
+    Handle(TDocStd_Document) aDoc;
+    anApp->NewDocument("MDTV-XCAF", aDoc);
+    StepCAFReader.Transfer(aDoc);
 
-        if (shape.IsNull()) {
-            // If no TopoDS shape, try to find precomputed center (e.g., AIS_Triangulation)
-            Handle(AIS_Triangulation) tri = Handle(AIS_Triangulation)::DownCast(obj);
-            if (!tri.IsNull()) {
-                size_t key = reinterpret_cast<size_t>(tri.get());
-                auto it = gSceneState.ObjectCenters.find(key);
-                if (it != gSceneState.ObjectCenters.end()) {
-                    gp_Pnt c = it->second;
-                    // apply local transformation if any
-                    gp_Trsf L = obj->LocalTransformation();
-                    c.Transform(L);
-                    Bnd_Box bb; bb.SetGap(0.0); bb.Add(c);
-                    totalBox.Add(bb);
-                    has = true;
-                }
-            }
-            continue;
-        }
+    // 提取 root shape
+    Handle(XCAFDoc_ShapeTool) aShapeTool = XCAFDoc_DocumentTool::ShapeTool(aDoc->Main());
+    TDF_LabelSequence labels;
+    aShapeTool->GetFreeShapes(labels);
 
-        // 计算 shape 的包围盒
-        Bnd_Box box; box.SetGap(0.0);
-        BRepBndLib::Add(shape, box);
-        if (box.IsVoid()) continue;
-
-        // transform the 8 corners by LocalTransformation (works fine even if identity)
-        gp_Trsf L = obj->LocalTransformation();
-        Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; box.Get(xmin,ymin,zmin,xmax,ymax,zmax);
-        gp_Pnt corners[8] = {
-            gp_Pnt(xmin,ymin,zmin), gp_Pnt(xmin,ymin,zmax), gp_Pnt(xmin,ymax,zmin), gp_Pnt(xmin,ymax,zmax),
-            gp_Pnt(xmax,ymin,zmin), gp_Pnt(xmax,ymin,zmax), gp_Pnt(xmax,ymax,zmin), gp_Pnt(xmax,ymax,zmax)
-        };
-        Bnd_Box tb; tb.SetGap(0.0);
-        for (int i=0;i<8;++i){ gp_Pnt p = corners[i]; p.Transform(L); tb.Add(p); }
-        totalBox.Add(tb);
-        has = true;
-    }
-
-    if (!has) return gp_Pnt(0,0,0);
-
-    Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; totalBox.Get(xmin,ymin,zmin,xmax,ymax,zmax);
-    gp_Pnt center((xmin+xmax)*0.5, (ymin+ymax)*0.5, (zmin+zmax)*0.5);
-    return center;
+    if (labels.Length() > 0)
+        return aShapeTool->GetShape(labels.Value(1));
+    else
+        return TopoDS_Shape();
 }
-
-// Helper: compute group's half-diagonal (approximate radius) by accumulating transformed bbox
-static double ComputeGroupHalfDiagonal(const std::vector<Handle(AIS_InteractiveObject)>& group)
-{
-    Bnd_Box totalBox; totalBox.SetGap(0.0);
-    bool has = false;
-
-    for (const auto& obj : group) {
-        if (obj.IsNull()) continue;
-
-        TopoDS_Shape shape;
-        Handle(AIS_Shape) s = Handle(AIS_Shape)::DownCast(obj);
-        if (!s.IsNull()) shape = s->Shape();
-        else {
-            Handle(AIS_ModelWithAxis) m = Handle(AIS_ModelWithAxis)::DownCast(obj);
-            if (!m.IsNull()) shape = m->Shape();
-        }
-
-        if (!shape.IsNull()) {
-            Bnd_Box box; box.SetGap(0.0);
-            BRepBndLib::Add(shape, box);
-            if (box.IsVoid()) continue;
-            gp_Trsf L = obj->LocalTransformation();
-            Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; box.Get(xmin,ymin,zmin,xmax,ymax,zmax);
-            gp_Pnt corners[8] = {
-                gp_Pnt(xmin,ymin,zmin), gp_Pnt(xmin,ymin,zmax), gp_Pnt(xmin,ymax,zmin), gp_Pnt(xmin,ymax,zmax),
-                gp_Pnt(xmax,ymin,zmin), gp_Pnt(xmax,ymin,zmax), gp_Pnt(xmax,ymax,zmin), gp_Pnt(xmax,ymax,zmax)
-            };
-            Bnd_Box tb; tb.SetGap(0.0);
-            for (int i=0;i<8;++i){ gp_Pnt p = corners[i]; p.Transform(L); tb.Add(p); }
-            totalBox.Add(tb);
-            has = true;
-            continue;
-        }
-
-        Handle(AIS_Triangulation) tri = Handle(AIS_Triangulation)::DownCast(obj);
-        if (!tri.IsNull()) {
-            size_t key = reinterpret_cast<size_t>(tri.get());
-            auto it = gSceneState.ObjectCenters.find(key);
-            auto itR = gSceneState.ObjectHalfDiagonal.find(key);
-            if (it != gSceneState.ObjectCenters.end() && itR != gSceneState.ObjectHalfDiagonal.end()) {
-                gp_Pnt c = it->second;
-                double r = itR->second;
-                // use cube of half-length r around center
-                gp_Pnt pmin(c.X()-r, c.Y()-r, c.Z()-r);
-                gp_Pnt pmax(c.X()+r, c.Y()+r, c.Z()+r);
-                Bnd_Box bb; bb.SetGap(0.0); bb.Update(pmin.X(), pmin.Y(), pmin.Z(), pmax.X(), pmax.Y(), pmax.Z());
-                totalBox.Add(bb);
-                has = true;
-            }
-            continue;
-        }
-    }
-
-    if (!has) return 0.0;
-    Standard_Real xmin,ymin,zmin,xmax,ymax,zmax; totalBox.Get(xmin,ymin,zmin,xmax,ymax,zmax);
-    double dx = double(xmax - xmin);
-    double dy = double(ymax - ymin);
-    double dz = double(zmax - zmin);
-    double halfDiag = 0.5 * std::sqrt(dx*dx + dy*dy + dz*dz);
-    return halfDiag;
-}
-
-// 计算并应用 “零件组整体平移到骨骼组”
-void ComputeAndApplyTranslation(
-    const Handle(AIS_InteractiveContext)& ctx,
-    std::vector<Handle(AIS_InteractiveObject)>& parts,
-    const std::vector<Handle(AIS_InteractiveObject)>& bones,
-    gp_Trsf& outTrsf)
-{
-    if (parts.empty() || bones.empty()) return;
-
-    gp_Pnt centerBones = ComputeGroupCenter(ctx, bones);
-    gp_Pnt centerParts = ComputeGroupCenter(ctx, parts);
-
-    // compute approximate group 'radius' for safe separation
-    double halfDiagParts = ComputeGroupHalfDiagonal(parts);
-    double halfDiagBones = ComputeGroupHalfDiagonal(bones);
-
-    // margin to avoid parts touching bones (units same as model)
-    const double margin = 10.0; // mm (tunable)
-    double safeDistance = halfDiagParts + halfDiagBones + margin;
-
-    gp_Vec v(centerParts, centerBones); // vector from parts center -> bones center
-    double dist = v.Magnitude();
-
-    gp_Vec shift;
-    if (dist < 1e-6) {
-        // centers coincide -> pick arbitrary direction to move parts to "safeDistance" from bones
-        gp_Vec dir(1.0, 0.0, 0.0);
-        gp_Pnt target = centerBones.Translated(-dir.Normalized() * safeDistance);
-        shift = gp_Vec(centerParts, target);
-    } else {
-        gp_Vec dir = v;
-        dir.Normalize();
-        // target center for parts = bones center - dir * safeDistance
-        gp_Pnt target = centerBones.Translated(-dir * safeDistance);
-        shift = gp_Vec(centerParts, target);
-    }
-
-    gp_Trsf tr; tr.SetTranslation(shift);
-
-    // 对 parts 的 LocalTransformation 右乘该平移（保持原相对关系）
-    for (auto& p : parts) {
-        if (p.IsNull()) continue;
-        gp_Trsf cur = p->LocalTransformation();
-        gp_Trsf newL = cur.Multiplied(tr);
-        p->SetLocalTransformation(newL);
-        if (!ctx.IsNull()) ctx->Redisplay(p, Standard_False);
-    }
-
-    outTrsf = tr; // 保存平移
-}
-
-// 导入 STL 的逻辑（骨骼永远是世界坐标）
-void ImportSTL(SceneState& S, const Handle(AIS_InteractiveObject)& boneObj)
-{
-    if (boneObj.IsNull() ) return;
-
-    // Ensure scene context
-    if (S.Ctx.IsNull()) S.Ctx = gSceneState.Ctx;
-
-    // STL 保持原始坐标（World） —— 不改变 LocalTransformation
-    S.Bones.push_back(boneObj);
-
-    if (!S.HasBoneRef) {
-        S.HasBoneRef = true;
-
-        // 如果之前已有 STEP，则立即对所有 STEP 做整体平移
-        if (!S.Parts.empty() && !S.HasPartToBoneTrsf) {
-            ComputeAndApplyTranslation(S.Ctx, S.Parts, S.Bones, S.PartToBoneTrsf);
-            S.HasPartToBoneTrsf = true;
-            qDebug() << "[SceneState] Parts aligned to Bones after first STL import.";
-        }
-    }
-
-    // 显示并刷新
-    if (!S.Ctx.IsNull()) {
-        S.Ctx->Display(boneObj, Standard_True);
-        S.Ctx->UpdateCurrentViewer();
-    }
-}
-
-// 导入 STEP 的逻辑
-void ImportSTEP(SceneState& S, const Handle(AIS_InteractiveObject)& partObj)
-{
-    if (partObj.IsNull()) return;
-
-    // Ensure scene context
-    if (S.Ctx.IsNull()) S.Ctx = gSceneState.Ctx;
-
-    // 记录到 Parts 列表
-    S.Parts.push_back(partObj);
-
-    // 如果还没有骨骼（HasBoneRef = false）：STEP 暂时不变换，只显示
-    if (!S.HasBoneRef) {
-        if (!S.Ctx.IsNull()) S.Ctx->Display(partObj, Standard_True);
-        qDebug() << "[SceneState] STEP imported before Bones; displayed without alignment.";
-        return;
-    }
-
-    // 如果骨骼已出现且还没对齐过：调用 ComputeAndApplyTranslation 并保存
-    if (S.HasBoneRef && !S.HasPartToBoneTrsf) {
-        ComputeAndApplyTranslation(S.Ctx, S.Parts, S.Bones, S.PartToBoneTrsf);
-        S.HasPartToBoneTrsf = true;
-        if (!S.Ctx.IsNull()) S.Ctx->Display(partObj, Standard_True);
-        qDebug() << "[SceneState] First alignment of Parts to Bones performed.";
-        return;
-    }
-
-    // 如果骨骼已出现且已对齐过：对新 STEP 右乘 PartToBoneTrsf
-    if (S.HasBoneRef && S.HasPartToBoneTrsf) {
-        gp_Trsf cur = partObj->LocalTransformation();
-        gp_Trsf newL = cur.Multiplied(S.PartToBoneTrsf);
-        partObj->SetLocalTransformation(newL);
-        if (!S.Ctx.IsNull()) S.Ctx->Display(partObj, Standard_True);
-        if (!S.Ctx.IsNull()) S.Ctx->Redisplay(partObj, Standard_False);
-        qDebug() << "[SceneState] New STEP aligned using saved PartToBoneTrsf.";
-        return;
-    }
-}
-
+*/
 // 读取 STL 并直接在给定的 AIS_InteractiveContext 中显示（不加入 PartGraph 数据结构）。
 Handle(AIS_Shape) ImportStlToAIS(const std::string& sFileName, 
     const Handle(AIS_InteractiveContext)& context)
@@ -382,23 +153,6 @@ LoadStlLightweight(const std::string& file,
     aisTri->SetDisplayMode(AIS_WireFrame);        // 或 AIS_Shaded
     aisTri->SetColor(Quantity_NOC_RED);           // 随便选个颜色
 
-    // compute triangulation center and cache it
-    {
-        Standard_Real xmin=RealLast(), ymin=RealLast(), zmin=RealLast();
-        Standard_Real xmax=-RealLast(), ymax=-RealLast(), zmax=-RealLast();
-        for (Standard_Integer i=1;i<=tri->NbNodes();++i){ gp_Pnt pt = tri->Node(i); if (pt.X()<xmin) xmin=pt.X(); if (pt.Y()<ymin) ymin=pt.Y(); if (pt.Z()<zmin) zmin=pt.Z(); if (pt.X()>xmax) xmax=pt.X(); if (pt.Y()>ymax) ymax=pt.Y(); if (pt.Z()>zmax) zmax=pt.Z(); }
-        if (xmax>=xmin) {
-            gp_Pnt center((xmin+xmax)*0.5, (ymin+ymax)*0.5, (zmin+zmax)*0.5);
-            double dx = double(xmax - xmin);
-            double dy = double(ymax - ymin);
-            double dz = double(zmax - zmin);
-            double halfDiag = 0.5 * std::sqrt(dx*dx + dy*dy + dz*dz);
-            size_t key = reinterpret_cast<size_t>(aisTri.get());
-            gSceneState.ObjectCenters[key] = center;
-            gSceneState.ObjectHalfDiagonal[key] = halfDiag;
-        }
-    }
-
     ctx->Display(aisTri, Standard_True);
 
     qDebug().noquote()
@@ -407,15 +161,6 @@ LoadStlLightweight(const std::string& file,
 
     return aisTri;
 }
-
-
-
-
-
-
-
-
-
 
 
 

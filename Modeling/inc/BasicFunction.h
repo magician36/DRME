@@ -8,9 +8,6 @@
 #include <vector>
 #include "AIS_ModelWithAxis.h"
 
-#include <Bnd_Box.hxx>
-#include <gp_Trsf.hxx>
-#include <unordered_map>
 
 TopoDS_Shape ImportStp(std::string sFileName);
 void ExtractCylinderAxes(const TopoDS_Shape& shape, const std::string& savePath);
@@ -26,41 +23,3 @@ Handle(AIS_ModelWithAxis) ImportStlToAISModel(const std::string& sFileName, cons
 
 // 新增：轻量 STL 加载（不进 PartGraph，只显示）
 Handle(AIS_InteractiveObject)LoadStlLightweight(const std::string& file,const Handle(AIS_InteractiveContext)& ctx);
-
-// ===== Scene management for aligning STEP to STL (bones) =====
-struct SceneState {
-    Handle(AIS_InteractiveContext) Ctx;
-
-    std::vector<Handle(AIS_InteractiveObject)> Bones; // STL models
-    std::vector<Handle(AIS_InteractiveObject)> Parts; // STEP models
-
-    bool HasBoneRef = false;          // 是否已经导入过骨骼（即世界坐标是否确定）
-    bool HasPartToBoneTrsf = false;   // 是否已经计算过“STEP → 骨骼”的整体平移
-    gp_Trsf PartToBoneTrsf;           // 保存零件整体平移变换
-
-    // 缓存非 TopoDS 对象（例如 AIS_Triangulation）的几何中心
-    std::unordered_map<size_t, gp_Pnt> ObjectCenters;
-    // 缓存非 TopoDS 对象的半对角长度（用于估算分离距离）
-    std::unordered_map<size_t, double> ObjectHalfDiagonal;
-};
-
-// 计算一组对象的包围盒中心，会自动考虑 LocalTransformation
-gp_Pnt ComputeGroupCenter(
-    const Handle(AIS_InteractiveContext)& ctx,
-    const std::vector<Handle(AIS_InteractiveObject)>& group);
-
-// 计算并应用 “零件组整体平移到骨骼组”
-void ComputeAndApplyTranslation(
-    const Handle(AIS_InteractiveContext)& ctx,
-    std::vector<Handle(AIS_InteractiveObject)>& parts,
-    const std::vector<Handle(AIS_InteractiveObject)>& bones,
-    gp_Trsf& outTrsf);
-
-// 导入 STL 的逻辑（骨骼永远是世界坐标）
-void ImportSTL(SceneState& S, const Handle(AIS_InteractiveObject)& boneObj);
-
-// 导入 STEP 的逻辑
-void ImportSTEP(SceneState& S, const Handle(AIS_InteractiveObject)& partObj);
-
-// 全局场景状态（在 BasicFunction.cpp 中定义）
-extern SceneState gSceneState;
