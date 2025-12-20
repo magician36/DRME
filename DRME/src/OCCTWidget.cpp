@@ -25,17 +25,6 @@
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
 #include "OCCBrepDataProcess.h"
-#include "BonePointTool.h"
-
-#include <AIS_Point.hxx>
-#include <Geom_CartesianPoint.hxx>
-#include <AIS_ColoredShape.hxx>
-#include <AIS_Shape.hxx>
-#include <BRepBuilderAPI_MakeVertex.hxx>
-#include <BRepExtrema_DistShapeShape.hxx>
-#include <IntCurvesFace_ShapeIntersector.hxx>
-#include <gp_Lin.hxx>
-#include <ElCLib.hxx>
 
 OCCTWidget::OCCTWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -52,9 +41,6 @@ OCCTWidget::OCCTWidget(QWidget *parent) : QOpenGLWidget(parent)
 	setAttribute(Qt::WA_NoSystemBackground);
 	setFocusPolicy(Qt::StrongFocus);
 
-    // Initialize m_bonePointTool here, but we need m_InteractiveContext and m_3dView which are initialized in initializeInteractiveContext
-    // However, initializeInteractiveContext is called in constructor if m_InteractiveContext is null.
-    // Let's check initializeInteractiveContext.
 }
 
 void OCCTWidget::initializeInteractiveContext()
@@ -120,14 +106,9 @@ void OCCTWidget::initializeInteractiveContext()
         m_InteractiveContext->SetDisplayMode(AIS_Shaded, Standard_True);
 		m_InteractiveContext->DefaultDrawer()->SetFaceBoundaryDraw(true);
 		
-		// 允许拾取边/面/点，提升骨头拾取精度
-		m_InteractiveContext->Activate(TopAbs_EDGE,  Standard_True);
-		m_InteractiveContext->Activate(TopAbs_FACE,  Standard_True);
-		m_InteractiveContext->Activate(TopAbs_VERTEX,Standard_True);
+		m_InteractiveContext->Activate(TopAbs_EDGE, Standard_True);
 		m_InteractiveContext->SetPixelTolerance(10); // 提高拾取容差
 
-        // Initialize BonePointTool after context and view are ready
-        m_bonePointTool = std::make_unique<BonePointTool>(m_InteractiveContext, m_3dView, this);
     }
 }
 
@@ -182,7 +163,7 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 		m_yValue = event->y();
 
 		// 检测是否选中对象
-		AIS_StatusOfPick t_pick_status = m_InteractiveContext->SelectDetected();
+		AIS_StatusOfPick t_pick_status = m_InteractiveContext->SelectDetected();																												
 		QMenu* menu = new QMenu();
 
 		if (t_pick_status == AIS_SOP_OneSelected)
@@ -312,7 +293,7 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
                                 aManipulator->SetPart(keep, AIS_MM_Translation, Standard_True);
                                 
                                 qDebug() << "[操纵器] 已约束棒" << QString::fromStdString(selfName) 
-								 << "只允许沿轴" << keep << "平移";
+									 << "只允许沿轴" << keep << "平移";
                             }
                         }
                     }
@@ -445,59 +426,67 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 
 		delete menu;
 	}
-	else if ((event->buttons() & Qt::LeftButton))
+	else if (event->buttons() & Qt::LeftButton)
 	{
-        // 记录位置
-        m_xValue = event->x();
-        m_yValue = event->y();
+		// 记录位置
+		m_xValue = event->x();
+		m_yValue = event->y();
 
-        // 把鼠标位置传给 interactive context，确保检测是基于当前坐标的
-        m_InteractiveContext->MoveTo(event->pos().x(), event->pos().y(), m_3dView, Standard_True);
+		// 把鼠标位置传给 interactive context，确保检测是基于当前坐标的
+		m_InteractiveContext->MoveTo(event->pos().x(), event->pos().y(), m_3dView, Standard_True);
 
-        // 检查是不是点到操纵器（DetectedInteractive() 返回被检测到的 AIS 对象）
-        if (!aManipulator.IsNull()
-            && m_InteractiveContext->HasDetected()
-            && m_InteractiveContext->DetectedInteractive() == aManipulator)
-        {
-            // 点击到操纵器 → 开始变换
-            aManipulator->StartTransform(event->pos().x(), event->pos().y(), m_3dView);
-            m_usingManipulator = true;
+		// 检查是不是点到操纵器（DetectedInteractive() 返回被检测到的 AIS 对象）
+		if (!aManipulator.IsNull()
+			&& m_InteractiveContext->HasDetected()
+			&& m_InteractiveContext->DetectedInteractive() == aManipulator)
+		{
+			// 点击到操纵器 → 开始变换（注意 StartTransform 的签名你项目中用的是 (x,y,view)）
+			aManipulator->StartTransform(event->pos().x(), event->pos().y(), m_3dView);
 
-            // ... 你原本的操纵器/装配整体移动逻辑 ...
+			// 标记：本次拖拽会话是操纵器
+			m_usingManipulator = true;
 
-            return;
-        }
+			// === 新增：若用户通过右键选择了“整体操纵”或操纵器当前模式为 Assembly，在 StartTransform 时进入装配整体移动模式 ===
+			if ((m_manipulatorMode == ManipulatorMode::Assembly || m_requestedWholeAssembly) && m_partGraph && !m_attachedModel.IsNull()) {
+				std::string partName = m_partGraph->FindPartByModel(m_attachedModel);
+				if (!partName.empty()) {
+					std::string asmName = m_partGraph->FindAssemblyForPart(partName);
+					if (!asmName.empty()) {
+						m_isMovingAssemblyActive = true;
+						m_activeAssemblyName = asmName;
+						m_assemblyRefPrevL = m_attachedModel->LocalTransformation();
+						m_requestedWholeAssembly = false; // 已开始
+						qDebug() << "[Assembly] Start moving assembly" << QString::fromStdString(asmName)
+							 << "refPart=" << QString::fromStdString(partName);
+					}
+				}
+			}
 
-        // === 如果开启了"骨点装配工具"，在骨头表面打红点 ===
-        if (m_bonePointTool && m_bonePointTool->IsEnabled())
-        {
-            if (m_bonePointTool->HandleMousePress(event->pos().x(), event->pos().y(), ais_shape)) {
-                return; // 标记完成后直接返回，避免进入旋转逻辑
-            }
-        }
+			return;
+		}
 
-        // 没点到操纵器 → 进入视角旋转
-        m_3dView->StartRotation(event->x(), event->y());
+		// 没点到操纵器 → 进入视角旋转
+		m_3dView->StartRotation(event->x(), event->y());
 
-        // 保持你的选择逻辑
-        AIS_StatusOfPick t_pick_status = AIS_SOP_NothingSelected;
-        if (qApp->keyboardModifiers() == Qt::ControlModifier)
-            t_pick_status = m_InteractiveContext->SelectDetected(AIS_SelectionScheme_Add);
-        else
-            t_pick_status = m_InteractiveContext->SelectDetected();
+		// 保持你的选择逻辑
+		AIS_StatusOfPick t_pick_status = AIS_SOP_NothingSelected;
+		if (qApp->keyboardModifiers() == Qt::ControlModifier)
+			t_pick_status = m_InteractiveContext->SelectDetected(AIS_SelectionScheme_Add);
+		else
+			t_pick_status = m_InteractiveContext->SelectDetected();
 
-        if (t_pick_status == AIS_SOP_OneSelected)
-        {
-            m_InteractiveContext->InitSelected();
-            while (m_InteractiveContext->MoreSelected())
-            {
-                if (m_InteractiveContext->HasSelectedShape())
-                {
-                    // 你需要的处理
-                }
-                m_InteractiveContext->NextSelected();
-            }
-        }
+		if (t_pick_status == AIS_SOP_OneSelected)
+		{
+			m_InteractiveContext->InitSelected();
+			while (m_InteractiveContext->MoreSelected())
+			{
+				if (m_InteractiveContext->HasSelectedShape())
+				{
+					// 你需要的处理
+				}
+				m_InteractiveContext->NextSelected();
+			}
+		}
 	}
 }
 
@@ -582,11 +571,6 @@ void OCCTWidget::mouseMoveEvent(QMouseEvent *event)
 				// 更新参考变换以进行增量更新
 				m_assemblyRefPrevL = Lnow;
 			}
-			
-			// === 新增：骨头或零件动了，让所有附着点跟着更新 ===
-			if (m_bonePointTool) {
-                m_bonePointTool->UpdateMarkers();
-            }
 			
 			m_3dView->Redraw();
 			qDebug() << "[Transform] Manipulator active, moving...";
@@ -757,17 +741,6 @@ void OCCTWidget::HighlightAxis(int index, bool highlight)
 	m_InteractiveContext->Redisplay(shape, Standard_False);
 }
 
-void OCCTWidget::setBonePointToolEnabled(bool on) {
-    if (m_bonePointTool) {
-        m_bonePointTool->SetEnabled(on);
-        qDebug() << "[BoneTool] enabled =" << on;
-    }
-}
-
-bool OCCTWidget::bonePointToolEnabled() const {
-    return m_bonePointTool ? m_bonePointTool->IsEnabled() : false;
-}
-
 // === 应用自由度投影：限制棒/螺钉轴向；滑块可沿并绕棒孔轴（整体+螺钉） ===
 void OCCTWidget::ApplyDOFProjectionForActive()
 {
@@ -879,14 +852,6 @@ void OCCTWidget::RememberAttachedModel(const Handle(AIS_ModelWithAxis)& model)
         m_prevL = model->LocalTransformation();
     } else {
         m_prevL = gp_Trsf();  // 默认构造为单位矩阵
-    }
-}
-
-// === 根据骨头当前变换，更新所有红点的位置 ===
-void OCCTWidget::UpdateBoneMarkers()
-{
-    if (m_bonePointTool) {
-        m_bonePointTool->UpdateMarkers();
     }
 }
 

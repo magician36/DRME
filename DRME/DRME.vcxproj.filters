@@ -42,9 +42,6 @@
     <ClCompile Include="src\AssemblyDialog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\BonePointTool.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\OCCBrepDataProcess.h">
@@ -54,9 +51,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="inc\ClosableTabWidget.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="inc\BonePointTool.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -38,8 +38,6 @@
 #include <AIS_ColoredShape.hxx>
 #include <AIS_Shape.hxx>
 #include <AIS_Manipulator.hxx>
-#include <AIS_Point.hxx>
-#include <Geom_CartesianPoint.hxx>
 #ifdef _WIN32
 #include <WNT_Window.hxx>
 #else
@@ -47,12 +45,8 @@
 #include <Xw_Window.hxx>
 #endif
 #include <string>
-#include <vector>
-#include <memory> // Added for std::unique_ptr
-
 class Ui_MainWindow;
 class AIS_ModelWithAxis;
-class BonePointTool; // Forward declaration
 
 class PartGraph;
 
@@ -71,6 +65,7 @@ public:
 
     //  获取三维显示界面
     Handle(V3d_View)  get3dView(){return m_3dView;}
+
 	//  获取三维显示界面
 	Handle(V3d_Viewer)  get3dViewer() { return m_3dViewer; }
 
@@ -112,18 +107,11 @@ public:
     void ApplyDOFProjectionForActive();
     void RememberAttachedModel(const Handle(AIS_ModelWithAxis)& model);
 
-    // === 新增：骨点装配工具接口 ===
-public:
-    void setBonePointToolEnabled(bool on);
-    bool bonePointToolEnabled() const;
-
 private:
 
     // 初始化交互环境
     void initializeInteractiveContext();
 
-    // 根据骨头当前变换，更新所有红点的位置
-    void UpdateBoneMarkers();
 
     // 交互式上下文能够管理一个或多个查看器(viewer)中的图形行为和交互式对象的选择
     Handle(AIS_InteractiveContext) m_InteractiveContext;
@@ -147,7 +135,7 @@ private:
     bool m_isMovingAssemblyActive = false;      // 本次操纵是否为装配整体移动
     std::string m_activeAssemblyName;           // 当前正在移动的装配名
     gp_Trsf m_assemblyRefPrevL;                 // 参考零件上一次记录的变换
-    // 当用户在右键菜单选择"整体操纵"时设为 true，直到 StartTransform 开始实际移动或取消
+    // 当用户在右键菜单选择“整体操纵”时设为 true，直到 StartTransform 开始实际移动或取消
     bool m_requestedWholeAssembly = false;
 
     // 当前操纵器模式：用于区分单件操纵或整体装配操纵（persistent while manipulator attached）
@@ -157,10 +145,10 @@ private:
 protected:
 
     // 覆写绘图事件
-    void paintEvent(QPaintEvent *_);
+    void paintEvent(QPaintEvent *);
 
     // 覆写窗口尺寸变化事件
-    void resizeEvent(QResizeEvent *_);
+    void resizeEvent(QResizeEvent *);
 
     // 覆写鼠标按键按下事件
     void mousePressEvent(QMouseEvent *event);
@@ -202,8 +190,6 @@ private:
     std::vector<gp_Ax1> m_axes;                   // 每条轴线的几何信息
     std::string m_axisJsonFile;                   // 记录保存的 JSON 文件路径
 
-    // === 骨点装配工具成员 ===
-    std::unique_ptr<BonePointTool> m_bonePointTool;
 };
 
 #endif // OCCTWIDGET_H

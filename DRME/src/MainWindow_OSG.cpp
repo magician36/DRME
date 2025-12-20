@@ -574,7 +574,7 @@ void Ui_MainWindow::ViewCascade()
 
  	 MainWindow->addDockWidget(Qt::LeftDockWidgetArea, FeatureItems);
 
- // === 右侧零件库工具栏 ===
+// === 右侧零件库工具栏 ===
      QToolBar* partToolBar = addToolBar(tr("零件库"));
      partToolBar->setObjectName(QStringLiteral("PartLibraryToolBar"));
      partToolBar->setOrientation(Qt::Vertical);
@@ -648,34 +648,6 @@ void Ui_MainWindow::ViewCascade()
              });
      }
 
-     // === 菜单栏：骨点装配工具 ===
-     QMenuBar* bar = MainWindow->menuBar();
-     QMenu* assembleMenu = nullptr;
-     for (QAction* act : bar->actions())
-     {
-         QMenu* m = act->menu();
-         if (m && m->title() == QStringLiteral("装配"))
-         {
-             assembleMenu = m;
-             break;
-         }
-     }
-     if (!assembleMenu)
-     {
-         assembleMenu = bar->addMenu(QStringLiteral("装配"));
-     }
-     actionBonePointTool = new QAction(QStringLiteral("骨点装配工具"), MainWindow);
-     actionBonePointTool->setCheckable(true);
-     assembleMenu->addAction(actionBonePointTool);
-     QObject::connect(actionBonePointTool, &QAction::toggled,
-                      MainWindow, [this](bool on)
-     {
-         QMdiSubWindow* subWin = mdiArea->currentSubWindow();
-         if (!subWin) return;
-         OCCTWidget* occW = qobject_cast<OCCTWidget*>(subWin->widget());
-         if (!occW) return;
-         occW->setBonePointToolEnabled(on);
-     });
  }
 
  // ================= Undo / Redo core =================

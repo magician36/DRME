@@ -1,7 +1,5 @@
 ﻿#include "BasicFunction.h"
-#include <AIS_ColoredShape.hxx>
 #include <StlAPI_Reader.hxx>
-#include <BRepMesh_IncrementalMesh.hxx>
 #include <Poly_Triangulation.hxx>
 #include <AIS_Triangulation.hxx>
 #include <AIS_Shape.hxx>
@@ -266,39 +264,18 @@ void ImportSTEP(SceneState& S, const Handle(AIS_InteractiveObject)& partObj)
 }
 
 // 读取 STL 并直接在给定的 AIS_InteractiveContext 中显示（不加入 PartGraph 数据结构）。
-Handle(AIS_Shape) ImportStlToAIS(const std::string& sFileName,
+Handle(AIS_Shape) ImportStlToAIS(const std::string& sFileName, 
     const Handle(AIS_InteractiveContext)& context)
 {
-    if (sFileName.empty() || context.IsNull()) return nullptr;
-
-    TopoDS_Shape stlShape;
-    StlAPI_Reader reader;
-    reader.Read(stlShape, sFileName.c_str());
-    if (stlShape.IsNull()) {
-        qWarning() << "[ImportStlToAIS] STL read failed:" << QString::fromStdString(sFileName);
-        return nullptr;
-    }
-
-    // 可选：确保有三角网格（用于显示/拾取更稳定）
-    try {
-        BRepMesh_IncrementalMesh mesher(stlShape, 0.5 /* deflection(mm) */, false, 0.5, true);
-    } catch (...) {}
-
-    Handle(AIS_ColoredShape) ais = new AIS_ColoredShape(stlShape);
-    ais->SetDisplayMode(AIS_Shaded);
-
-    // 颜色你可按需改
-    ais->SetColor(Quantity_NOC_GOLDENROD);
-
-    context->Display(ais, Standard_False);
-    context->Redisplay(ais, Standard_False);
-    context->UpdateCurrentViewer();
-
-    return ais; // 作为 AIS_Shape 返回（AIS_ColoredShape 是 AIS_Shape 子类）
+    //“空壳 + 警告”
+    Q_UNUSED(sFileName);
+    Q_UNUSED(context);
+    qWarning() << "ImportStlToAIS is deprecated. Use LoadStlLightweight instead.";
+    return nullptr;
 }
 
 // 读取 STL 并构造为 AIS_ModelWithAxis（包含操纵杆支持），返回 handle 并在 context 中显示。
-Handle(AIS_ModelWithAxis) ImportStlToAISModel(const std::string& sFileName,
+Handle(AIS_ModelWithAxis) ImportStlToAISModel(const std::string& sFileName, 
     const Handle(AIS_InteractiveContext)& context)
 {
     //“空壳 + 警告”
@@ -321,7 +298,7 @@ LoadStlLightweight(const std::string& file,
     // 1) 以二进制方式打开 STL 文件
     std::ifstream in(file, std::ios::binary);
     if (!in) {
-        qWarning() << "[LoadStlLightweight] 无法打开 STL 文件:" 
+        qWarning() << "[LoadStlLightweight] 无法打开 STL 文件:"
             << QString::fromStdString(file);
         return nullptr;
     }
@@ -332,7 +309,7 @@ LoadStlLightweight(const std::string& file,
     in.seekg(0, std::ios::beg);
 
     if (fileSize < 84) {
-        qWarning() << "[LoadStlLightweight] STL 文件太小，可能损坏:" 
+        qWarning() << "[LoadStlLightweight] STL 文件太小，可能损坏:"
             << QString::fromStdString(file);
         return nullptr;
     }
@@ -423,9 +400,6 @@ LoadStlLightweight(const std::string& file,
     }
 
     ctx->Display(aisTri, Standard_True);
-    // 让 AIS_Triangulation 参与检测/拾取，并刷新当前视图
-    ctx->Activate(aisTri, 0, Standard_False);
-    ctx->UpdateCurrentViewer();
 
     qDebug().noquote()
         << QStringLiteral("[LoadStlLightweight] 使用 AIS_Triangulation 轻量显示 STL")
@@ -433,62 +407,6 @@ LoadStlLightweight(const std::string& file,
 
     return aisTri;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
