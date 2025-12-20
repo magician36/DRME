@@ -146,45 +146,26 @@ LoadStlLightweight(const std::string& file,
         << "triCount =" << triCount
         << QStringLiteral(", 节点数 =") << nbNodes;
 
-    // === 新增：计算 STL 包围盒中心，用于平移到原点附近 ===
-    Bnd_Box stlBox;
-    for (Standard_Integer i = 1; i <= nbNodes; ++i) {
-        stlBox.Add(tri->Node(i));
-    }
-
-    Standard_Real stlXMin, stlYMin, stlZMin, stlXMax, stlYMax, stlZMax;
-    stlBox.Get(stlXMin, stlYMin, stlZMin, stlXMax, stlYMax, stlZMax);
-
-    Standard_Real cx = 0.5 * (stlXMin + stlXMax);
-    Standard_Real cy = 0.5 * (stlYMin + stlYMax);
-    Standard_Real cz = 0.5 * (stlZMin + stlZMax);
-
-    qDebug().noquote()
-        << QStringLiteral("[LoadStlLightweight] STL 原始中心：")
-        << "cx =" << cx << ", cy =" << cy << ", cz =" << cz;
     // 5) 构造 AIS_Triangulation（真正轻量级显示）
     Handle(AIS_Triangulation) aisTri = new AIS_Triangulation(tri);
     aisTri->SetDisplayMode(AIS_WireFrame);
     aisTri->SetColor(Quantity_NOC_RED);
 
-    // ======== 在这里加入平移到原点 + 手动偏移的代码 ========
-    gp_Trsf trsf;
 
-    // 随时调整的偏移量
-    Standard_Real offsetX = 0.0;
-    Standard_Real offsetY = 100.0;
-    Standard_Real offsetZ = -350.0;
+    // 计算一下三角网的包围盒
+    Bnd_Box box;
+    for (Standard_Integer i = 1; i <= nbNodes; ++i) {
+        box.Add(tri->Node(i));
+    }
+    Standard_Real xMin, yMin, zMin, xMax, yMax, zMax;
+    box.Get(xMin, yMin, zMin, xMax, yMax, zMax);
 
-    // 把 STL 中心从 (cx, cy, cz) 移到 (offsetX, offsetY, offsetZ)
-    trsf.SetTranslation(
-        gp_Vec(-cx + offsetX,
-            -cy + offsetY,
-            -cz + offsetZ)
-    );
+    qDebug().noquote()
+        << QStringLiteral("[LoadStlLightweight] BBox:")
+        << "X:[" << xMin << "," << xMax << "]"
+        << "Y:[" << yMin << "," << yMax << "]"
+        << "Z:[" << zMin << "," << zMax << "]";
 
-    // 把这个平移应用到 AIS_Triangulation 上
-    aisTri->SetLocalTransformation(trsf);
-    // ====================================================
 
     ctx->Display(aisTri, Standard_True);
 
