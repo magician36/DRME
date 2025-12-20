@@ -106,11 +106,12 @@ LoadStlLightweight(const std::string& file,
     }
 
     // 3) 创建 Poly_Triangulation
-    //    简化起见：每个三角形使用 3 个独立节点（不做顶点合并）
+    //    每个三角形使用 3 个独立节点（不做顶点合并）
     const Standard_Integer nbNodes = static_cast<Standard_Integer>(triCount) * 3;
     const Standard_Integer nbTriangles = static_cast<Standard_Integer>(triCount);
 
-    Handle(Poly_Triangulation) tri = new Poly_Triangulation(nbNodes, nbTriangles, Standard_False);
+    Handle(Poly_Triangulation) tri =
+        new Poly_Triangulation(nbNodes, nbTriangles, Standard_False);
 
     // 4) 逐个三角形读取数据
     for (uint32_t i = 0; i < triCount; ++i)
@@ -142,58 +143,25 @@ LoadStlLightweight(const std::string& file,
             Poly_Triangle(base + 1, base + 2, base + 3));
     }
 
-    qDebug().noquote() << QStringLiteral("[LoadStlLightweight]已从二进制 STL 读取三角形数量")
+    qDebug().noquote()
+        << QStringLiteral("[LoadStlLightweight]已从二进制 STL 读取三角形数量")
         << "triCount =" << triCount
         << QStringLiteral(", 节点数 =") << nbNodes;
 
-    // === 新增：计算 STL 包围盒中心，用于平移到原点附近 ===
-    Bnd_Box stlBox;
-    for (Standard_Integer i = 1; i <= nbNodes; ++i) {
-        stlBox.Add(tri->Node(i));
-    }
-
-    Standard_Real stlXMin, stlYMin, stlZMin, stlXMax, stlYMax, stlZMax;
-    stlBox.Get(stlXMin, stlYMin, stlZMin, stlXMax, stlYMax, stlZMax);
-
-    Standard_Real cx = 0.5 * (stlXMin + stlXMax);
-    Standard_Real cy = 0.5 * (stlYMin + stlYMax);
-    Standard_Real cz = 0.5 * (stlZMin + stlZMax);
-
-    qDebug().noquote()
-        << QStringLiteral("[LoadStlLightweight] STL 原始中心：")
-        << "cx =" << cx << ", cy =" << cy << ", cz =" << cz;
-    // 5) 构造 AIS_Triangulation（真正轻量级显示）
+    // 5) 构造 AIS_Triangulation（真正轻量级显示，不改坐标）
     Handle(AIS_Triangulation) aisTri = new AIS_Triangulation(tri);
-    aisTri->SetDisplayMode(AIS_WireFrame);
-    aisTri->SetColor(Quantity_NOC_RED);
-
-    // ======== 在这里加入平移到原点 + 手动偏移的代码 ========
-    gp_Trsf trsf;
-
-    // 随时调整的偏移量
-    Standard_Real offsetX = 0.0;
-    Standard_Real offsetY = 100.0;
-    Standard_Real offsetZ = -350.0;
-
-    // 把 STL 中心从 (cx, cy, cz) 移到 (offsetX, offsetY, offsetZ)
-    trsf.SetTranslation(
-        gp_Vec(-cx + offsetX,
-            -cy + offsetY,
-            -cz + offsetZ)
-    );
-
-    // 把这个平移应用到 AIS_Triangulation 上
-    aisTri->SetLocalTransformation(trsf);
-    // ====================================================
+    aisTri->SetDisplayMode(AIS_WireFrame);        // 或 AIS_Shaded
+    aisTri->SetColor(Quantity_NOC_RED);           // 随便选个颜色
 
     ctx->Display(aisTri, Standard_True);
 
-    qDebug().noquote() 
+    qDebug().noquote()
         << QStringLiteral("[LoadStlLightweight] 使用 AIS_Triangulation 轻量显示 STL")
         << QString::fromStdString(file);
 
     return aisTri;
 }
+
 
 
 
