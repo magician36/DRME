@@ -20,6 +20,8 @@ class AIS_ModelWithAxis : public AIS_ColoredShape
 public:
     AIS_ModelWithAxis(const TopoDS_Shape& shape, const std::string& axisFile);
 
+    // ? 新增：从另一个模型复制轴线、半径和孔类型
+    void CloneAxisDataFrom(const Handle(AIS_ModelWithAxis)& other);
 
     // 切换轴线显示
     void SetAxesVisible(bool visible);
@@ -46,6 +48,9 @@ public:
         return gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1));
     }
 
+    // 返回用于加载轴线的源 JSON 文件路径（用于 UI 显示）
+    std::string GetAxisFile() const { return m_axisFile; }
+
 protected:
     // 覆写绘制：先调用父类绘制模型，再叠加轴线
     void Compute(
@@ -63,7 +68,7 @@ private:
     void RebuildCylFacesFromShape(const TopoDS_Shape& s);
 
 private:
-    bool m_axesVisible = true;
+	bool m_axesVisible = false;         //轴线显示开关
     std::vector<gp_Ax1> m_axes;         //每条轴线
     std::vector<double> m_radii;        //轴线半径
     std::vector<HoleType> m_holeTypes; // 每条轴线的类型

@@ -19,15 +19,15 @@ public:
     // 返回: 装配是否成功
     bool AssembleParts(const std::string& partA, const std::string& partB, int holeIndexB);
 
+    // 公共接口：将计算得到的 world->world 变换合成为模型的本地变换并应用
+    bool ApplyTransformation(PartInfo& partInfo, const gp_Trsf& trsf);
+
 private:
     // 构造稳定的参考坐标系（用于精确变换）
     gp_Ax2 BuildFrame(const gp_Ax1& axis) const;
 
     // 查找源零件上与目标孔类型匹配的孔轴
     bool FindSourceAxis(const PartInfo& partInfo, HoleType targetHoleType, gp_Ax1& outAxis) const;
-
-    // 应用变换并更新孔轴位置
-    bool ApplyTransformation(PartInfo& partInfo, const gp_Trsf& trsf);
 
     // 更新装配约束关系
     void UpdateConstraints(PartInfo& partA, const std::string& partBName, HoleType holeType);

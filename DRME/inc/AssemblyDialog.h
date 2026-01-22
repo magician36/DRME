@@ -39,6 +39,8 @@ private:
     void highlightPart(const Handle(AIS_ModelWithAxis)& model);
     void highlightHoleFace(const Handle(AIS_ModelWithAxis)& model, const gp_Ax1& axis, double radius);
 
+    void resetUI();
+
 private:
     PartGraph* m_graph;
     Handle(AIS_InteractiveContext) m_context;
@@ -58,3 +60,4 @@ private:
 
     Handle(AIS_InteractiveObject) m_highlightedFace;
 };
+//ljb是我爹

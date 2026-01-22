@@ -188,12 +188,15 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 						aManipulator->DeactivateCurrentMode();
 						aManipulator->Detach();
 						RememberAttachedModel(Handle(AIS_ModelWithAxis)());  // 清空
+						// 取消任何未开始的整体操纵请求
+						m_requestedWholeAssembly = false;
+						// 重置操纵器模式
+						m_manipulatorMode = ManipulatorMode::None;
 						qDebug() << "[Manipulator] 已解除绑定";
 					});
 			}
 			else
-			{	
-				
+			{ 
 				QAction* actManip = new QAction(QStringLiteral("操纵"), menu);
 				menu->addAction(actManip);
 
@@ -217,9 +220,13 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 					aManipulator->EnableMode(AIS_ManipulatorMode::AIS_MM_Translation);
 					aManipulator->SetModeActivationOnDetection(Standard_True);
 
-					// === 记住被操纵的模型 ===
-					if (!attachedModel.IsNull()) {
-						RememberAttachedModel(attachedModel);
+                    // 设置操纵器模式为单件操纵
+                    m_manipulatorMode = ManipulatorMode::Part;
+                    m_requestedWholeAssembly = false;
+
+                    // === 记住被操纵的模型 ===
+                    if (!attachedModel.IsNull()) {
+                        RememberAttachedModel(attachedModel);
 
                         // === 新增：对螺钉进行操纵器裁剪（仅保留沿约束轴的一个平移手柄，禁用旋转） ===
                         std::string selfName; PartType pty = PartType::Rod;
@@ -253,47 +260,92 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
                             }
                         }
 
-						// === 根据 Mate 裁剪"棒"的操纵器 ===
-						auto chooseAxisIndex2 = [&](const Handle(AIS_ModelWithAxis)& mdl, const gp_Dir& allowAxisW)->int {
-							gp_Trsf Linv = mdl->LocalTransformation(); 
-							Linv.Invert();
-							gp_Dir uL(gp_Dir(allowAxisW.Transformed(Linv)));
-							double dx = fabs(uL.Dot(gp_Dir(1,0,0)));
-							double dy = fabs(uL.Dot(gp_Dir(0,1,0)));
-							double dz = fabs(uL.Dot(gp_Dir(0,0,1)));
-							if (dz >= dx && dz >= dy) return 2;
-							if (dy >= dx && dy >= dz) return 1;
-							return 0;
-						};
+                        // === 根据 Mate 裁剪"棒"的操纵器 ===
+                        auto chooseAxisIndex2 = [&](const Handle(AIS_ModelWithAxis)& mdl, const gp_Dir& allowAxisW)->int {
+                            gp_Trsf Linv = mdl->LocalTransformation(); 
+                            Linv.Invert();
+                            gp_Dir uL(gp_Dir(allowAxisW.Transformed(Linv)));
+                            double dx = fabs(uL.Dot(gp_Dir(1,0,0)));
+                            double dy = fabs(uL.Dot(gp_Dir(0,1,0)));
+                            double dz = fabs(uL.Dot(gp_Dir(0,0,1)));
+                            if (dz >= dx && dz >= dy) return 2;
+                            if (dy >= dx && dy >= dz) return 1;
+                            return 0;
+                        };
 
-						if (pty == PartType::Rod || pty == PartType::Screw) {
-							// 读取 Mate 的"滑块孔轴(世界)"
-							gp_Dir allowU(0,0,1); 
-							bool ok=false;
-							for (const auto& m : m_partGraph->GetMates()) {
-								if (m.rodName == selfName) { 
-									allowU = m.rodAxis.Direction(); 
-									ok=true; 
-									break;
-								}
-							}
-							if (ok) {
-								// 禁用旋转：不启用旋转模式即可
-								aManipulator->EnableMode(AIS_MM_Translation);  // 只启用平移
-								for (int i=0;i<3;++i) 
-									aManipulator->SetPart(i, AIS_MM_Translation, Standard_False);
-								int keep = chooseAxisIndex2(attachedModel, allowU);
-								aManipulator->SetPart(keep, AIS_MM_Translation, Standard_True);
-								
-								qDebug() << "[操纵器] 已约束棒" << QString::fromStdString(selfName) 
+                        if (pty == PartType::Rod || pty == PartType::Screw) {
+                            // 读取 Mate 的"滑块孔轴(世界)"
+                            gp_Dir allowU(0,0,1); 
+                            bool ok=false;
+                            for (const auto& m : m_partGraph->GetMates()) {
+                                if (m.rodName == selfName) { 
+                                    allowU = m.rodAxis.Direction(); 
+                                    ok=true; 
+                                    break;
+                                }
+                            }
+                            if (ok) {
+                                // 禁用旋转：不启用旋转模式即可
+                                aManipulator->EnableMode(AIS_MM_Translation);  // 只启用平移
+                                for (int i=0;i<3;++i) 
+                                    aManipulator->SetPart(i, AIS_MM_Translation, Standard_False);
+                                int keep = chooseAxisIndex2(attachedModel, allowU);
+                                aManipulator->SetPart(keep, AIS_MM_Translation, Standard_True);
+                                
+                                qDebug() << "[操纵器] 已约束棒" << QString::fromStdString(selfName) 
 									 << "只允许沿轴" << keep << "平移";
-							}
-						}
-					}
+                            }
+                        }
+                    }
 
 					qDebug() << "[Manipulator] 已激活";
 				});
 			}
+
+			// === 增加整体操纵菜单项（当选中零件属于某个装配组时显示） ===
+			{
+				Handle(AIS_ModelWithAxis) selModel;
+				m_InteractiveContext->InitSelected();
+				if (m_InteractiveContext->MoreSelected()) {
+					Handle(AIS_InteractiveObject) obj = m_InteractiveContext->SelectedInteractive();
+					selModel = Handle(AIS_ModelWithAxis)::DownCast(obj);
+				}
+				if (!selModel.IsNull() && m_partGraph) {
+					std::string partName = m_partGraph->FindPartByModel(selModel);
+					if (!partName.empty()) {
+						std::string asmName = m_partGraph->FindAssemblyForPart(partName);
+						if (!asmName.empty()) {
+							QAction* actWhole = new QAction(QStringLiteral("整体操纵"), menu);
+							menu->addAction(actWhole);
+							connect(actWhole, &QAction::triggered, this, [this, selModel, asmName]() {
+								if (aManipulator.IsNull()) aManipulator = new AIS_Manipulator();
+								// Reset manipulator parts: allow full translation and rotation for whole-assembly move
+                                aManipulator->SetPart(0, AIS_ManipulatorMode::AIS_MM_Scaling, Standard_False);
+                                // Enable both translation and rotation modes and allow all axes
+                                aManipulator->EnableMode(AIS_ManipulatorMode::AIS_MM_Translation);
+                                for (int i = 0; i < 3; ++i) {
+                                    aManipulator->SetPart(i, AIS_ManipulatorMode::AIS_MM_Translation, Standard_True);
+                                }
+                                aManipulator->EnableMode(AIS_ManipulatorMode::AIS_MM_Rotation);
+                                for (int i = 0; i < 3; ++i) {
+                                    aManipulator->SetPart(i, AIS_ManipulatorMode::AIS_MM_Rotation, Standard_True);
+                                }
+
+                                aManipulator->Attach(Handle(AIS_InteractiveObject)(selModel));
+                                aManipulator->SetModeActivationOnDetection(Standard_True);
+                                // 标记用户请求整体操纵，实际进入 assembly 移动在 StartTransform 时决定
+                                m_requestedWholeAssembly = true;
+                                // 设置操纵器模式为整体装配
+                                m_manipulatorMode = ManipulatorMode::Assembly;
+                                // 记住模型，以便在 StartTransform 时能知道参考对象
+                                RememberAttachedModel(selModel);
+                                qDebug() << "[Assembly] Requested whole-assembly move:" << QString::fromStdString(asmName);
+							});
+						}
+					}
+				}
+			}
+
 			// === 菜单项：装配 ===
 			QAction* actAssemble = new QAction(QStringLiteral("装配…"), menu);
 			menu->addAction(actAssemble);
@@ -393,6 +445,23 @@ void OCCTWidget::mousePressEvent(QMouseEvent *event)
 
 			// 标记：本次拖拽会话是操纵器
 			m_usingManipulator = true;
+
+			// === 新增：若用户通过右键选择了“整体操纵”或操纵器当前模式为 Assembly，在 StartTransform 时进入装配整体移动模式 ===
+			if ((m_manipulatorMode == ManipulatorMode::Assembly || m_requestedWholeAssembly) && m_partGraph && !m_attachedModel.IsNull()) {
+				std::string partName = m_partGraph->FindPartByModel(m_attachedModel);
+				if (!partName.empty()) {
+					std::string asmName = m_partGraph->FindAssemblyForPart(partName);
+					if (!asmName.empty()) {
+						m_isMovingAssemblyActive = true;
+						m_activeAssemblyName = asmName;
+						m_assemblyRefPrevL = m_attachedModel->LocalTransformation();
+						m_requestedWholeAssembly = false; // 已开始
+						qDebug() << "[Assembly] Start moving assembly" << QString::fromStdString(asmName)
+							 << "refPart=" << QString::fromStdString(partName);
+					}
+				}
+			}
+
 			return;
 		}
 
@@ -431,6 +500,27 @@ void OCCTWidget::mouseReleaseEvent(QMouseEvent* event)
 			aManipulator->StopTransform(Standard_True);
 			qDebug() << "[StopTransform] HasActive=" << aManipulator->HasActiveMode();   // 👈 插在这里
 			m_usingManipulator = false;
+
+			// 如果这是装配整体移动会话，结束时清理状态
+			if (m_isMovingAssemblyActive) {
+				m_isMovingAssemblyActive = false;
+				m_activeAssemblyName.clear();
+				qDebug() << "[Assembly] End moving assembly";
+			}
+
+			// === 新增：把当前场景中所有模型的 local transform 写回 PartGraph，保持内存一致 ===
+			if (m_partGraph) {
+				auto& parts = m_partGraph->GetMutableParts();
+				for (auto& kv : parts) {
+					PartInfo& info = kv.second;
+					if (info.model.IsNull()) continue;
+					gp_Trsf L = info.model->LocalTransformation();
+					// 将变换写回 PartGraph（也会设置到模型上，保证一致）
+					m_partGraph->UpdatePartTransform(kv.first, L);
+				}
+				qDebug() << "[StopTransform] PartGraph transforms updated.";
+			}
+
 			m_3dView->Redraw();
 		}
 		else
@@ -464,7 +554,23 @@ void OCCTWidget::mouseMoveEvent(QMouseEvent *event)
 			aManipulator->Transform(event->pos().x(), event->pos().y(), m_3dView);
 			
 			// === 应用自由度约束投影 ===
-			ApplyDOFProjectionForActive();
+			// 如果当前不是整体装配移动（或未请求整体移动），才应用零件级 DOF 投影
+            if (!(m_isMovingAssemblyActive || m_requestedWholeAssembly || m_manipulatorMode == ManipulatorMode::Assembly)) {
+                ApplyDOFProjectionForActive();
+            }
+
+			// === 新增：若当前会话为装配整体移动，则计算参考零件的增量并应用到组 ===
+			if (m_isMovingAssemblyActive && m_partGraph && !m_attachedModel.IsNull()) {
+				gp_Trsf Lnow = m_attachedModel->LocalTransformation();
+				gp_Trsf Linv = m_assemblyRefPrevL;
+				Linv.Invert();
+				gp_Trsf delta = Lnow;
+				delta.Multiply(Linv); // delta = Lnow * inv(prev)
+				// 调用 PartGraph 进行移动（此函数会对每个成员应用 delta）
+				m_partGraph->MoveAssembly(m_activeAssemblyName, delta, m_InteractiveContext);
+				// 更新参考变换以进行增量更新
+				m_assemblyRefPrevL = Lnow;
+			}
 			
 			m_3dView->Redraw();
 			qDebug() << "[Transform] Manipulator active, moving...";
@@ -584,13 +690,27 @@ void OCCTWidget::ShowAxes(bool visible)
 
 	for (auto& model : m_models)
 	{
-		model->SetAxesVisible(visible);
-		m_InteractiveContext->Redisplay(model, Standard_False);
+		if (model.IsNull()) continue;
+
+		// 只有 AIS_ModelWithAxis 才有轴线可显隐
+		if (model->IsKind(STANDARD_TYPE(AIS_ModelWithAxis)))
+		{
+			Handle(AIS_ModelWithAxis) mw =
+				Handle(AIS_ModelWithAxis)::DownCast(model);
+
+			if (!mw.IsNull())
+			{
+				mw->SetAxesVisible(visible);
+				m_InteractiveContext->Redisplay(mw, Standard_False);
+			}
+		}
 	}
 
 	m_3dView->Redraw();
 	qDebug() << "[ShowAxes] 所有轴线" << (visible ? "已显示" : "已隐藏");
 }
+
+
 
 // 清除所有模型
 void OCCTWidget::ClearAxes()
@@ -625,6 +745,13 @@ void OCCTWidget::HighlightAxis(int index, bool highlight)
 void OCCTWidget::ApplyDOFProjectionForActive()
 {
     if (m_attachedModel.IsNull() || !m_partGraph) return;
+
+    // 如果当前是整体装配移动（或用户已请求整体移动），则不应用单零件 DOF 约束
+    if (m_isMovingAssemblyActive || m_requestedWholeAssembly) {
+        // 更新上一帧变换基准并返回
+        m_prevL = m_attachedModel->LocalTransformation();
+        return;
+    }
 
     // 反查当前选中对象名称与类型
     std::string selfName; PartType selfType = PartType::Rod; const PartInfo* pSelf = nullptr;

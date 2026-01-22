@@ -128,7 +128,8 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32;%(PreprocessorDefinitions);Q_COMPILER_UNIFORM_INIT</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>GeneratedFiles\$(ConfigurationName);GeneratedFiles;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include;C:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;$(ProjectDir)inc;$(ProjectDir)..\Mesh\inc;$(ProjectDir)..\Modeling\inc;C:\Users\Administrator\Desktop\Gmsh\Gmsh\include;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtCore;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtGui;C:\Qt\Qt5.14.2\5.14.2\msvc2015_64\include\QtWidgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/Zc:strictStrings- /Zc:rvalueCast- /DQT_NO_CAST_FROM_ASCII /DQT_NO_CAST_TO_ASCII %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zc:strictStrings- /Zc:rvalueCast- /DQT_NO_CAST_FROM_ASCII /DQT_NO_CAST_TO_ASCII 
+ %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>

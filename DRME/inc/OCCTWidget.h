@@ -44,6 +44,7 @@
 #undef None
 #include <Xw_Window.hxx>
 #endif
+#include <string>
 class Ui_MainWindow;
 class AIS_ModelWithAxis;
 
@@ -88,7 +89,8 @@ public:
     bool m_usingManipulator = false;
     
     // 所有加载的模型对象
-    std::vector<Handle(AIS_ModelWithAxis)> m_models;  
+    std::vector<Handle(AIS_InteractiveObject)> m_models;
+
 
     bool m_isAssemblyMode = false;
     void setAssemblyMode(bool enable) { m_isAssemblyMode = enable; }
@@ -128,6 +130,17 @@ private:
     // === 操纵器约束相关成员 ===
     Handle(AIS_ModelWithAxis) m_attachedModel;  // 当前被操纵的模型
     gp_Trsf m_prevL;                            // 上一帧的变换矩阵
+
+    // === 装配整体移动状态 ===
+    bool m_isMovingAssemblyActive = false;      // 本次操纵是否为装配整体移动
+    std::string m_activeAssemblyName;           // 当前正在移动的装配名
+    gp_Trsf m_assemblyRefPrevL;                 // 参考零件上一次记录的变换
+    // 当用户在右键菜单选择“整体操纵”时设为 true，直到 StartTransform 开始实际移动或取消
+    bool m_requestedWholeAssembly = false;
+
+    // 当前操纵器模式：用于区分单件操纵或整体装配操纵（persistent while manipulator attached）
+    enum class ManipulatorMode { None = 0, Part = 1, Assembly = 2 };
+    ManipulatorMode m_manipulatorMode = ManipulatorMode::None;
 
 protected:
 

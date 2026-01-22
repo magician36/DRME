@@ -3,10 +3,13 @@
 #include <vector>
 #include <map>
 #include <gp_Ax1.hxx>
+#include <gp_Trsf.hxx>
 #include <json.hpp>
+#include <AIS_InteractiveContext.hxx>
 
 class AIS_ModelWithAxis;
-class PartAssembler;  // 前向声明
+class PartAssembler;
+class IModelLoader;   // 前向声明
 
 using json = nlohmann::json;
 
@@ -63,14 +66,23 @@ struct PartInfo
 
     bool isLockedOnRod = false;                         //  是否是否固定
     std::vector<std::string> connectedParts;            //  和谁装配
+
+    std::string sourcePath;                             // 新增: 原始几何来源路径
+};
+
+// === 装配组信息（方案 A 需要的最小数据） ===
+struct AssemblyInfo
+{
+    std::vector<std::string> members; // 成员零件名称
+    gp_Trsf transform; // 组级变换（累积）
 };
 
 // === 零件图：管理所有零件 ===
 class PartGraph
 {
 public:
-    void AddPart(const std::string& name, PartType type, const Handle(AIS_ModelWithAxis)& model, double mainRadius);
-    //void AddHole(const std::string& partName, HoleType holeType, const gp_Ax1& axis, double radius);
+    // 新增: 添加 sourcePath 参数
+    void AddPart(const std::string& name, PartType type, const Handle(AIS_ModelWithAxis)& model, double mainRadius, const std::string& sourcePath);
 
     void AddConstraint(const std::string& partName, const std::string& targetName, HoleType type);
 
@@ -80,9 +92,31 @@ public:
 
     void PrintSummary() const;
     void SaveToJson(const std::string& file) const;
-    
+    bool LoadFromJson(const std::string& file); // 原始版本: 仅读结构, 不自动建模
+
+    // 新增: 自动建模版本 (如果模型为空且提供 loader 则尝试重建)
+    bool LoadFromJson(const std::string& file, IModelLoader* loader);
+
     // 只读访问函数
     const std::map<std::string, PartInfo>& GetParts() const { return parts; }
+
+    // 新增：可变访问（允许外部在装配后更新 PartInfo）
+    std::map<std::string, PartInfo>& GetMutableParts() { return parts; }
+
+    // 查找由 model 对象对应的零件名称（若无匹配返回空字符串）
+    std::string FindPartByModel(const Handle(AIS_ModelWithAxis)& model) const;
+
+    // 更新零件的本地变换（写回内存），用于操纵器结束时持久化
+    void UpdatePartTransform(const std::string& partName, const gp_Trsf& localTrsf);
+
+    // === 装配组管理（方案 A） ===
+    bool CreateAssembly(const std::string& name, const std::vector<std::string>& members);
+    bool RemoveAssembly(const std::string& name);
+    bool AddPartToAssembly(const std::string& assemblyName, const std::string& partName);
+    std::vector<std::string> GetAssemblyMembers(const std::string& name) const;
+    bool MoveAssembly(const std::string& name, const gp_Trsf& delta, const Handle(AIS_InteractiveContext)& ctx = Handle(AIS_InteractiveContext)());
+    // 查找某个零件属于哪个装配（如果有）
+    std::string FindAssemblyForPart(const std::string& partName) const;
 
     // === 新增：查询“滑块绑定的棒轴 & 螺钉列表” ===
     // 获取该滑块对应的“棒”装配（若有），用于得到棒轴（世界）
@@ -97,4 +131,7 @@ private:
     DOFInfo InferDOF(PartType type);
     std::map<std::string, PartInfo> parts;
     std::vector<MateConstraint> mates;  // 所有装配约束
+
+    // 装配组存储
+    std::map<std::string, AssemblyInfo> assemblies;
 };
